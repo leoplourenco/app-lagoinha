@@ -58,10 +58,60 @@ function jsWeekdaySp(year: number, month: number, day: number) {
   return isoDay === 7 ? 0 : isoDay
 }
 
-/**
- * Próximas ocorrências da grade padrão, ordenadas.
- * weeks=6 cobre ~mês+ para o líder marcar vários cultos de uma vez.
- */
+function daysInMonth(year: number, month: number) {
+  return new Date(Date.UTC(year, month, 0)).getUTCDate()
+}
+
+/** Cultos padrão de um mês civil (1–12), em SP. */
+export function standardServicesForMonth(
+  year: number,
+  month: number,
+  opts?: { includePast?: boolean },
+): ProposedService[] {
+  const now = Date.now()
+  const includePast = opts?.includePast ?? false
+  const out: ProposedService[] = []
+  const lastDay = daysInMonth(year, month)
+
+  for (let day = 1; day <= lastDay; day++) {
+    const weekday = jsWeekdaySp(year, month, day)
+    for (const def of STANDARD_SERVICES) {
+      if (def.weekday !== weekday) continue
+      const startsAtIso = spCivilToIso(year, month, day, def.hour, def.minute)
+      if (!includePast && new Date(startsAtIso).getTime() < now - 30 * 60 * 1000) continue
+
+      out.push({
+        key: `${def.id}-${dayKeySp(startsAtIso)}`,
+        title: def.title,
+        startsAtIso,
+        dayLabel: formatSp(startsAtIso, 'EEEE, dd/MM'),
+        timeLabel: formatEventTime(startsAtIso),
+        isStandard: true,
+        standardId: def.id,
+      })
+    }
+  }
+
+  return out.sort(
+    (a, b) => new Date(a.startsAtIso).getTime() - new Date(b.startsAtIso).getTime(),
+  )
+}
+
+export function currentSpYearMonth() {
+  const [y, m] = dayKeySp(new Date()).split('-').map(Number)
+  return { year: y, month: m }
+}
+
+export function shiftYearMonth(year: number, month: number, delta: number) {
+  const utc = new Date(Date.UTC(year, month - 1 + delta, 1))
+  return { year: utc.getUTCFullYear(), month: utc.getUTCMonth() + 1 }
+}
+
+export function formatYearMonthLabel(year: number, month: number) {
+  return formatSp(spCivilToIso(year, month, 1, 12, 0), 'MMMM yyyy')
+}
+
+/** @deprecated use standardServicesForMonth — mantido se algum ponto ainda chamar */
 export function upcomingStandardServices(weeks = 6): ProposedService[] {
   const now = Date.now()
   const [y0, m0, d0] = dayKeySp(new Date()).split('-').map(Number)

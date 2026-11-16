@@ -8,7 +8,10 @@ import { useServiceEvents } from '../hooks/useServiceEvents'
 import {
   STANDARD_SERVICES,
   buildSpecialService,
-  upcomingStandardServices,
+  currentSpYearMonth,
+  formatYearMonthLabel,
+  shiftYearMonth,
+  standardServicesForMonth,
   type ProposedService,
 } from '../lib/serviceDefaults'
 import { findOrCreateServiceEvent } from '../lib/serviceEvents'
@@ -30,10 +33,13 @@ export function EscalaPage() {
   const canManage = isLeader || isAdmin
   const managedIds = useMemo(() => leaderMinistryIds(memberships), [memberships])
   const { schedulableEvents, activeEvent, refresh } = useServiceEvents()
-  const standardOptions = useMemo(() => upcomingStandardServices(6), [])
+  const initialYm = useMemo(() => currentSpYearMonth(), [])
 
   const [mode, setMode] = useState<'padrao' | 'especial'>('padrao')
+  const [viewYear, setViewYear] = useState(initialYm.year)
+  const [viewMonth, setViewMonth] = useState(initialYm.month)
   const [selectedKeys, setSelectedKeys] = useState<string[]>([])
+  const [optionsCache, setOptionsCache] = useState<Record<string, ProposedService>>({})
   const [specialExtras, setSpecialExtras] = useState<ProposedService[]>([])
   const [eventId, setEventId] = useState<string | null>(null)
   const [selecting, setSelecting] = useState(false)
@@ -48,18 +54,38 @@ export function EscalaPage() {
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
 
-  const allOptions = useMemo(() => {
-    const map = new Map<string, ProposedService>()
-    for (const opt of standardOptions) map.set(opt.key, opt)
-    for (const opt of specialExtras) map.set(opt.key, opt)
-    return [...map.values()].sort(
-      (a, b) => new Date(a.startsAtIso).getTime() - new Date(b.startsAtIso).getTime(),
-    )
-  }, [standardOptions, specialExtras])
+  const monthOptions = useMemo(
+    () => standardServicesForMonth(viewYear, viewMonth),
+    [viewYear, viewMonth],
+  )
+
+  const monthLabel = useMemo(
+    () => formatYearMonthLabel(viewYear, viewMonth),
+    [viewYear, viewMonth],
+  )
+
+  const isCurrentMonth =
+    viewYear === initialYm.year && viewMonth === initialYm.month
+
+  useEffect(() => {
+    setOptionsCache((prev) => {
+      const next = { ...prev }
+      for (const opt of monthOptions) next[opt.key] = opt
+      for (const opt of specialExtras) next[opt.key] = opt
+      return next
+    })
+  }, [monthOptions, specialExtras])
 
   const selectedOptions = useMemo(
-    () => allOptions.filter((o) => selectedKeys.includes(o.key)),
-    [allOptions, selectedKeys],
+    () =>
+      selectedKeys
+        .map((key) => optionsCache[key])
+        .filter(Boolean)
+        .sort(
+          (a, b) =>
+            new Date(a.startsAtIso).getTime() - new Date(b.startsAtIso).getTime(),
+        ),
+    [selectedKeys, optionsCache],
   )
 
   const leaderMinistries = useMemo(() => {
@@ -189,12 +215,26 @@ export function EscalaPage() {
   }
 
   function selectByStandardId(standardId: string) {
-    const keys = standardOptions
+    const keys = monthOptions
       .filter((o) => o.standardId === standardId)
       .map((o) => o.key)
     setSelectedKeys((prev) => [...new Set([...prev, ...keys])])
     setMode('padrao')
     setMessage(null)
+  }
+
+  function goMonth(delta: number) {
+    const next = shiftYearMonth(viewYear, viewMonth, delta)
+    // Não volta para meses totalmente no passado
+    if (
+      delta < 0 &&
+      (next.year < initialYm.year ||
+        (next.year === initialYm.year && next.month < initialYm.month))
+    ) {
+      return
+    }
+    setViewYear(next.year)
+    setViewMonth(next.month)
   }
 
   function clearSelection() {
@@ -438,8 +478,23 @@ export function EscalaPage() {
 
           {mode === 'padrao' ? (
             <div className="space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={isCurrentMonth}
+                  onClick={() => goMonth(-1)}
+                >
+                  ←
+                </Button>
+                <p className="text-sm font-semibold capitalize text-gold">{monthLabel}</p>
+                <Button type="button" size="sm" variant="outline" onClick={() => goMonth(1)}>
+                  →
+                </Button>
+              </div>
               <p className="text-xs text-muted">
-                Toque para marcar/desmarcar. Pode selecionar vários do mês.
+                Lista do mês. Marque vários e troque de mês se precisar.
               </p>
               <div className="flex flex-wrap gap-2">
                 {STANDARD_SERVICES.map((def) => (
@@ -460,40 +515,46 @@ export function EscalaPage() {
                 ) : null}
               </div>
               <div className="grid gap-2">
-                {standardOptions.map((opt) => {
-                  const active = selectedKeys.includes(opt.key)
-                  return (
-                    <button
-                      key={opt.key}
-                      type="button"
-                      disabled={selecting}
-                      onClick={() => toggleKey(opt.key)}
-                      className={cn(
-                        'flex items-start gap-3 rounded-xl border px-3 py-3 text-left transition',
-                        active
-                          ? 'border-gold bg-gold/20'
-                          : 'border-white/15 bg-white/5 hover:bg-white/10',
-                      )}
-                    >
-                      <span
+                {monthOptions.length === 0 ? (
+                  <p className="rounded-xl border border-dashed border-white/20 px-3 py-3 text-sm text-muted">
+                    Nenhum culto restante neste mês.
+                  </p>
+                ) : (
+                  monthOptions.map((opt) => {
+                    const active = selectedKeys.includes(opt.key)
+                    return (
+                      <button
+                        key={opt.key}
+                        type="button"
+                        disabled={selecting}
+                        onClick={() => toggleKey(opt.key)}
                         className={cn(
-                          'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border text-xs',
+                          'flex items-start gap-3 rounded-xl border px-3 py-3 text-left transition',
                           active
-                            ? 'border-gold bg-gold text-ink'
-                            : 'border-white/30 text-transparent',
+                            ? 'border-gold bg-gold/20'
+                            : 'border-white/15 bg-white/5 hover:bg-white/10',
                         )}
                       >
-                        ✓
-                      </span>
-                      <span>
-                        <p className="font-semibold text-white">
-                          {opt.dayLabel} · {opt.timeLabel}
-                        </p>
-                        <p className="text-sm text-muted">{opt.title}</p>
-                      </span>
-                    </button>
-                  )
-                })}
+                        <span
+                          className={cn(
+                            'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border text-xs',
+                            active
+                              ? 'border-gold bg-gold text-ink'
+                              : 'border-white/30 text-transparent',
+                          )}
+                        >
+                          ✓
+                        </span>
+                        <span>
+                          <p className="font-semibold text-white">
+                            {opt.dayLabel} · {opt.timeLabel}
+                          </p>
+                          <p className="text-sm text-muted">{opt.title}</p>
+                        </span>
+                      </button>
+                    )
+                  })
+                )}
               </div>
             </div>
           ) : (
