@@ -140,7 +140,7 @@ export function AdminUsuariosPage() {
     }
 
     const ministryName = ministries.find((m) => m.id === ministryId)?.name ?? 'ministério'
-    setMessage(`${user.full_name} foi removido de ${ministryName}.`)
+    setMessage(`${user.full_name} foi desvinculado de ${ministryName}.`)
     await load()
   }
 
@@ -171,8 +171,8 @@ export function AdminUsuariosPage() {
         </Link>
         <h2 className="mt-2 font-brand text-2xl text-gold">Usuários</h2>
         <p className="mt-1 text-sm text-muted">
-          Cada ministério é separado. Remover = sai do ministério (não fica voluntário
-          escondido).
+          Por ministério: tornar líder, voluntário ou desvincular (sai de vez e perde o
+          acesso àquele hub).
         </p>
       </div>
 
@@ -257,7 +257,7 @@ export function AdminUsuariosPage() {
                                 variant="outline"
                                 onClick={() => void removeFromMinistry(user, ministry.id)}
                               >
-                                Remover
+                                Desvincular
                               </Button>
                             </>
                           ) : null}
@@ -272,10 +272,10 @@ export function AdminUsuariosPage() {
                               </Button>
                               <Button
                                 size="sm"
-                                variant="ghost"
+                                variant="outline"
                                 onClick={() => void removeFromMinistry(user, ministry.id)}
                               >
-                                Remover
+                                Desvincular
                               </Button>
                             </>
                           ) : null}
