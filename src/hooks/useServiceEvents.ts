@@ -36,10 +36,24 @@ export function useServiceEvents() {
     [events, todayKey],
   )
 
+  /** Próximos eventos (qualquer dia) — janela de 3h atrás até o futuro. */
   const upcomingEvents = useMemo(() => {
     const now = nowInSp().getTime()
-    return events.filter((e) => new Date(e.starts_at).getTime() >= now - 3 * 60 * 60 * 1000)
+    return events
+      .filter((e) => new Date(e.starts_at).getTime() >= now - 3 * 60 * 60 * 1000)
+      .sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime())
   }, [events])
+
+  /**
+   * Lista para montar escala/relatório: próximos por data/hora.
+   * Não trava em “só hoje” — permite sexta, sábado, especial etc.
+   */
+  const schedulableEvents = useMemo(() => {
+    if (upcomingEvents.length > 0) return upcomingEvents
+    return [...events]
+      .sort((a, b) => new Date(b.starts_at).getTime() - new Date(a.starts_at).getTime())
+      .slice(0, 12)
+  }, [upcomingEvents, events])
 
   const activeEvent = useMemo(() => {
     if (todayEvents.length === 1) return todayEvents[0]
@@ -59,6 +73,7 @@ export function useServiceEvents() {
     events,
     todayEvents,
     upcomingEvents,
+    schedulableEvents,
     activeEvent,
     loading,
     error,

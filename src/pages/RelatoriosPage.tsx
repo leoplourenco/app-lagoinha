@@ -35,8 +35,8 @@ export function RelatoriosPage() {
   const { memberships, isAdmin, isSalaMember } = useAuth()
   const managedIds = useMemo(() => leaderMinistryIds(memberships), [memberships])
   const managedNames = useMemo(() => leaderMinistryNames(memberships), [memberships])
-  const { todayEvents, upcomingEvents, events, activeEvent } = useServiceEvents()
-  const list = todayEvents.length > 0 ? todayEvents : upcomingEvents.length ? upcomingEvents : events
+  const { schedulableEvents, activeEvent } = useServiceEvents()
+  const list = schedulableEvents
   const [eventId, setEventId] = useState<string | null>(null)
   const [checkins, setCheckins] = useState<CheckinRow[]>([])
   const [attendance, setAttendance] = useState<AttendanceRow[]>([])
@@ -176,14 +176,19 @@ export function RelatoriosPage() {
         <h2 className="font-brand text-2xl">Relatórios</h2>
         <p className="mt-1 text-sm text-muted">
           {isAdmin
-            ? 'Presença e check-in por culto (visão completa).'
+            ? 'Presença e check-in por data/horário (visão completa).'
             : managedNames.length
               ? `Escopo: ${managedNames.join(' · ')}`
               : 'Presença só dos ministérios que você lidera.'}
         </p>
       </div>
 
-      <ServicePicker events={list} value={eventId} onChange={setEventId} />
+      <ServicePicker
+        events={list}
+        value={eventId}
+        onChange={setEventId}
+        label="Culto / evento por data e horário"
+      />
 
       {!isAdmin ? (
         <section className="space-y-2">

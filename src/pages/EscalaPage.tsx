@@ -21,8 +21,8 @@ export function EscalaPage() {
   const { user, isLeader, memberships, isAdmin } = useAuth()
   const canManage = isLeader || isAdmin
   const managedIds = useMemo(() => leaderMinistryIds(memberships), [memberships])
-  const { todayEvents, upcomingEvents, activeEvent } = useServiceEvents()
-  const events = todayEvents.length > 0 ? todayEvents : upcomingEvents
+  const { schedulableEvents, activeEvent } = useServiceEvents()
+  const events = schedulableEvents
   const [eventId, setEventId] = useState<string | null>(null)
   const [slots, setSlots] = useState<SlotRow[]>([])
   const [members, setMembers] = useState<(Profile & { user_id: string })[]>([])
@@ -161,11 +161,17 @@ export function EscalaPage() {
       <div>
         <h2 className="font-brand text-2xl">Escala</h2>
         <p className="mt-1 text-sm text-muted">
-          Cada culto tem sua escala, com rótulo (porta, café, recepção…).
+          Escolha o culto/evento pela data e horário (qualquer dia). Depois monte a
+          escala com rótulo (porta, café, recepção…).
         </p>
       </div>
 
-      <ServicePicker events={events} value={eventId} onChange={setEventId} />
+      <ServicePicker
+        events={events}
+        value={eventId}
+        onChange={setEventId}
+        label="Culto / evento por data e horário"
+      />
 
       {canManage ? (
         <form onSubmit={addSlot} className="space-y-3 rounded-2xl border border-white/15 bg-white/10 p-4">

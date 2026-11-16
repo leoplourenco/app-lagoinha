@@ -34,8 +34,24 @@ export function addDaysSp(date: Date, amount: number) {
   return addDays(date, amount)
 }
 
+/** Data + horário (qualquer dia da semana). */
+export function formatEventWhen(startsAt: string) {
+  return formatSp(startsAt, "EEEE, dd/MM/yyyy · HH:mm")
+}
+
+export function formatEventDay(startsAt: string) {
+  return formatSp(startsAt, "EEEE, dd/MM/yyyy")
+}
+
+export function formatEventTime(startsAt: string) {
+  return formatSp(startsAt, 'HH:mm')
+}
+
 export function labelService(title: string, startsAt: string) {
-  return `${title} · ${formatSp(startsAt, "dd/MM HH:mm")}`
+  const when = formatEventWhen(startsAt)
+  const clean = title?.trim()
+  if (!clean) return when
+  return `${when} · ${clean}`
 }
 
 export function friendlyTodayLabel() {

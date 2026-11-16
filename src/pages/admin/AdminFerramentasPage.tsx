@@ -4,13 +4,14 @@ import { QRCodeCanvas } from 'qrcode.react'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import { EmptyState } from '../../components/ui/empty-state'
+import { formatEventWhen } from '../../lib/timezone'
 import { supabase } from '../../lib/supabase'
 import type { ChurchQrCode, ServiceEvent } from '../../types/database'
 
 export function AdminFerramentasPage() {
   const [qr, setQr] = useState<ChurchQrCode | null>(null)
   const [events, setEvents] = useState<ServiceEvent[]>([])
-  const [title, setTitle] = useState('Domingo manhã')
+  const [title, setTitle] = useState('')
   const [startsAt, setStartsAt] = useState('')
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -19,7 +20,7 @@ export function AdminFerramentasPage() {
   async function load() {
     const [q, e] = await Promise.all([
       supabase.from('church_qr_codes').select('*').eq('active', true).limit(1).maybeSingle(),
-      supabase.from('service_events').select('*').order('starts_at', { ascending: false }).limit(20),
+      supabase.from('service_events').select('*').order('starts_at', { ascending: false }).limit(40),
     ])
     setQr((q.data as ChurchQrCode | null) ?? null)
     setEvents((e.data as ServiceEvent[]) ?? [])
@@ -31,19 +32,22 @@ export function AdminFerramentasPage() {
 
   async function createEvent() {
     setError(null)
+    setMessage(null)
     if (!startsAt) {
-      setError('Informe data/hora do culto.')
+      setError('Informe a data e o horário do evento.')
       return
     }
+    const label = title.trim() || 'Culto / evento'
     const { error: err } = await supabase.from('service_events').insert({
-      title,
+      title: label,
       starts_at: new Date(startsAt).toISOString(),
     })
     if (err) {
       setError(err.message)
       return
     }
-    setMessage('Culto criado.')
+    setMessage(`Evento criado: ${formatEventWhen(new Date(startsAt).toISOString())}`)
+    setTitle('')
     await load()
   }
 
@@ -74,7 +78,7 @@ export function AdminFerramentasPage() {
           ← Voltar ao admin
         </Link>
         <h2 className="mt-2 font-brand text-2xl text-gold">Ferramentas</h2>
-        <p className="mt-1 text-sm text-muted">QR de check-in e cadastro de cultos.</p>
+        <p className="mt-1 text-sm text-muted">QR de check-in e cadastro de cultos/eventos.</p>
       </div>
 
       <section className="rounded-2xl border border-white/10 bg-panel p-4">
@@ -93,20 +97,44 @@ export function AdminFerramentasPage() {
       </section>
 
       <section className="space-y-3 rounded-2xl border border-white/10 bg-panel p-4">
-        <h3 className="font-semibold">Novo culto</h3>
-        <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Título" />
-        <Input
-          type="datetime-local"
-          value={startsAt}
-          onChange={(e) => setStartsAt(e.target.value)}
-        />
-        <Button onClick={() => void createEvent()}>Criar culto</Button>
+        <h3 className="font-semibold">Novo culto / evento</h3>
+        <p className="text-sm text-muted">
+          Cadastre por data e horário — pode ser domingo, quarta, sexta, vigília,
+          especial etc.
+        </p>
+        <div>
+          <p className="mb-1 text-xs uppercase tracking-wide text-gold">Data e horário</p>
+          <Input
+            type="datetime-local"
+            value={startsAt}
+            onChange={(e) => setStartsAt(e.target.value)}
+          />
+        </div>
+        <div>
+          <p className="mb-1 text-xs uppercase tracking-wide text-gold">
+            Nome (opcional)
+          </p>
+          <Input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Ex.: Vigília, Conferência, Culto de jovens…"
+          />
+        </div>
+        <Button onClick={() => void createEvent()} className="w-full">
+          Criar por data e horário
+        </Button>
         <div className="space-y-2 pt-2">
-          {events.map((event) => (
-            <div key={event.id} className="rounded-xl bg-black/30 px-3 py-2 text-sm">
-              {event.title} · {new Date(event.starts_at).toLocaleString('pt-BR')}
-            </div>
-          ))}
+          <p className="text-xs uppercase tracking-wide text-muted">Últimos cadastrados</p>
+          {events.length === 0 ? (
+            <EmptyState title="Nenhum evento ainda" />
+          ) : (
+            events.map((event) => (
+              <div key={event.id} className="rounded-xl bg-black/30 px-3 py-2 text-sm">
+                <p className="font-medium text-white">{formatEventWhen(event.starts_at)}</p>
+                <p className="text-xs text-muted">{event.title}</p>
+              </div>
+            ))
+          )}
         </div>
       </section>
 
