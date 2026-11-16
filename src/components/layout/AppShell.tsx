@@ -8,6 +8,7 @@ import {
   Shield,
   Users,
   Utensils,
+  type LucideIcon,
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { cn } from '../../lib/utils'
@@ -20,8 +21,41 @@ const linkClass = ({ isActive }: { isActive: boolean }) =>
     isActive ? 'text-gold' : 'text-muted hover:text-white',
   )
 
+type NavItem = {
+  to: string
+  label: string
+  icon: LucideIcon
+  end?: boolean
+}
+
 export function AppShell() {
   const { profile, isAdmin, isLeader, isSalaMember, isHostMember } = useAuth()
+
+  const items: NavItem[] = [
+    { to: '/', label: 'Início', icon: Home, end: true },
+    { to: '/escala', label: 'Escalas', icon: CalendarDays },
+    { to: '/checkin', label: 'Check-in', icon: CheckSquare },
+  ]
+
+  if (isSalaMember) {
+    items.push({ to: '/sala', label: 'Sala', icon: Coffee })
+  } else if (isHostMember) {
+    items.push({ to: '/host', label: 'Host', icon: Utensils })
+  } else if (isLeader) {
+    items.push({ to: '/equipe', label: 'Equipe', icon: Users })
+  }
+
+  if (isAdmin) {
+    items.push({ to: '/admin', label: 'Admin', icon: Shield })
+  }
+
+  // Só um "Mais" — e só se ainda couber / não for admin-only sem config
+  if (!items.some((i) => i.to === '/config')) {
+    items.push({ to: '/config', label: 'Mais', icon: Settings })
+  }
+
+  // No máximo 5 abas (admin + sala: Início Escalas Check-in Sala Admin; Config no home)
+  const navItems = items.slice(0, 5)
 
   return (
     <div className="relative min-h-dvh overflow-hidden bg-ink text-white">
@@ -49,51 +83,16 @@ export function AppShell() {
       </div>
 
       <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-white/10 bg-black/90 backdrop-blur-md">
-        <div className="mx-auto grid max-w-lg grid-cols-5 gap-1 px-2 py-2">
-          <NavLink to="/" end className={linkClass}>
-            <Home className="h-4 w-4" />
-            Início
-          </NavLink>
-          <NavLink to="/escala" className={linkClass}>
-            <CalendarDays className="h-4 w-4" />
-            Escalas
-          </NavLink>
-          <NavLink to="/checkin" className={linkClass}>
-            <CheckSquare className="h-4 w-4" />
-            Check-in
-          </NavLink>
-          {isSalaMember ? (
-            <NavLink to="/sala" className={linkClass}>
-              <Coffee className="h-4 w-4" />
-              Sala
+        <div
+          className="mx-auto grid max-w-lg gap-1 px-2 py-2"
+          style={{ gridTemplateColumns: `repeat(${navItems.length}, minmax(0, 1fr))` }}
+        >
+          {navItems.map((item) => (
+            <NavLink key={item.to} to={item.to} end={item.end} className={linkClass}>
+              <item.icon className="h-4 w-4" />
+              {item.label}
             </NavLink>
-          ) : isHostMember ? (
-            <NavLink to="/host" className={linkClass}>
-              <Utensils className="h-4 w-4" />
-              Host
-            </NavLink>
-          ) : isLeader ? (
-            <NavLink to="/equipe" className={linkClass}>
-              <Users className="h-4 w-4" />
-              Equipe
-            </NavLink>
-          ) : (
-            <NavLink to="/config" className={linkClass}>
-              <Settings className="h-4 w-4" />
-              Mais
-            </NavLink>
-          )}
-          {isAdmin ? (
-            <NavLink to="/admin" className={linkClass}>
-              <Shield className="h-4 w-4" />
-              Admin
-            </NavLink>
-          ) : (
-            <NavLink to="/config" className={linkClass}>
-              <Settings className="h-4 w-4" />
-              Mais
-            </NavLink>
-          )}
+          ))}
         </div>
       </nav>
     </div>
