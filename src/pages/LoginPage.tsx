@@ -3,6 +3,7 @@ import { Eye, EyeOff, Lock, User } from 'lucide-react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { BrandMark } from '../components/brand/BrandMark'
 import { GoldWaves } from '../components/brand/GoldWaves'
+import { GoogleSignInButton } from '../components/GoogleSignInButton'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { useAuth } from '../context/AuthContext'
@@ -48,46 +49,56 @@ export function LoginPage() {
         <p className="mt-2 text-sm text-muted">Entre com suas credenciais para continuar.</p>
       </div>
 
-      <form onSubmit={onSubmit} className="mt-8 space-y-4">
-        <div className="relative">
-          <User className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gold" />
-          <Input
-            id="email"
-            type="email"
-            autoComplete="email"
-            placeholder="Usuário / e-mail"
-            className="pl-11"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
+      <div className="mt-8 space-y-4">
+        <GoogleSignInButton />
+
+        <div className="flex items-center gap-3 text-xs text-muted">
+          <div className="h-px flex-1 bg-white/15" />
+          ou com e-mail
+          <div className="h-px flex-1 bg-white/15" />
         </div>
-        <div className="relative">
-          <Lock className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gold" />
-          <Input
-            id="password"
-            type={showPassword ? 'text' : 'password'}
-            autoComplete="current-password"
-            placeholder="Senha"
-            className="px-11"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-          <button
-            type="button"
-            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1 text-muted hover:text-gold"
-            onClick={() => setShowPassword((v) => !v)}
-            aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
-          >
-            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-          </button>
-        </div>
-        {error ? <p className="text-sm text-rose-300">{error}</p> : null}
-        <Button type="submit" className="w-full" size="lg" disabled={loading}>
-          {loading ? 'Entrando…' : 'Entrar'}
-        </Button>
-      </form>
+
+        <form onSubmit={onSubmit} className="space-y-4">
+          <div className="relative">
+            <User className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gold" />
+            <Input
+              id="email"
+              type="email"
+              autoComplete="email"
+              placeholder="Usuário / e-mail"
+              className="pl-11"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </div>
+          <div className="relative">
+            <Lock className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gold" />
+            <Input
+              id="password"
+              type={showPassword ? 'text' : 'password'}
+              autoComplete="current-password"
+              placeholder="Senha"
+              className="px-11"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+            <button
+              type="button"
+              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1 text-muted hover:text-gold"
+              onClick={() => setShowPassword((v) => !v)}
+              aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+            >
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
+          {error ? <p className="text-sm text-rose-300">{error}</p> : null}
+          <Button type="submit" className="w-full" size="lg" disabled={loading}>
+            {loading ? 'Entrando…' : 'Entrar'}
+          </Button>
+        </form>
+      </div>
 
       <p className="mt-5 text-center text-sm text-gold">
         <Link to="/cadastro" className="hover:text-gold-soft">

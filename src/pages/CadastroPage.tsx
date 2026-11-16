@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { Lock, User } from 'lucide-react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { BrandMark } from '../components/brand/BrandMark'
+import { GoogleSignInButton } from '../components/GoogleSignInButton'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { useAuth } from '../context/AuthContext'
@@ -61,56 +62,66 @@ export function CadastroPage() {
         <p className="mt-2 text-sm text-muted">Cadastro de voluntário da Lagoinha.</p>
       </div>
 
-      <form onSubmit={onSubmit} className="mt-8 space-y-4">
-        <div className="relative">
-          <User className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gold" />
+      <div className="mt-8 space-y-4">
+        <GoogleSignInButton label="Cadastrar com Google" />
+
+        <div className="flex items-center gap-3 text-xs text-muted">
+          <div className="h-px flex-1 bg-white/15" />
+          ou com e-mail
+          <div className="h-px flex-1 bg-white/15" />
+        </div>
+
+        <form onSubmit={onSubmit} className="space-y-4">
+          <div className="relative">
+            <User className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gold" />
+            <Input
+              id="name"
+              placeholder="Nome completo"
+              className="pl-11"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              required
+            />
+          </div>
           <Input
-            id="name"
-            placeholder="Nome completo"
-            className="pl-11"
-            value={fullName}
-            onChange={(e) => setFullName(e.target.value)}
+            id="email"
+            type="email"
+            placeholder="E-mail"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
             required
           />
-        </div>
-        <Input
-          id="email"
-          type="email"
-          placeholder="E-mail"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-        />
-        <div className="relative">
-          <Lock className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gold" />
-          <Input
-            id="password"
-            type="password"
-            minLength={6}
-            placeholder="Senha"
-            className="pl-11"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-        </div>
-        <label className="flex items-start gap-3 rounded-2xl border border-white/10 bg-panel-2 p-3 text-sm text-muted">
-          <input
-            type="checkbox"
-            className="mt-1 accent-gold"
-            checked={accepted}
-            onChange={(e) => setAccepted(e.target.checked)}
-          />
-          <span>
-            <strong className="block text-white">Privacidade (LGPD leve)</strong>
-            {PRIVACY}
-          </span>
-        </label>
-        {error ? <p className="text-sm text-rose-300">{error}</p> : null}
-        <Button type="submit" className="w-full" size="lg" disabled={loading}>
-          {loading ? 'Criando…' : 'Criar conta'}
-        </Button>
-      </form>
+          <div className="relative">
+            <Lock className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gold" />
+            <Input
+              id="password"
+              type="password"
+              minLength={6}
+              placeholder="Senha"
+              className="pl-11"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </div>
+          <label className="flex items-start gap-3 rounded-2xl border border-white/10 bg-panel-2 p-3 text-sm text-muted">
+            <input
+              type="checkbox"
+              className="mt-1 accent-gold"
+              checked={accepted}
+              onChange={(e) => setAccepted(e.target.checked)}
+            />
+            <span>
+              <strong className="block text-white">Privacidade (LGPD leve)</strong>
+              {PRIVACY}
+            </span>
+          </label>
+          {error ? <p className="text-sm text-rose-300">{error}</p> : null}
+          <Button type="submit" className="w-full" size="lg" disabled={loading}>
+            {loading ? 'Criando…' : 'Criar conta'}
+          </Button>
+        </form>
+      </div>
 
       <p className="mt-5 text-center text-sm text-gold">
         <Link to="/login" className="hover:text-gold-soft">

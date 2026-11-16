@@ -52,6 +52,17 @@ Fluxo admin: pastores se cadastram → Leo promove em `/admin`.
 | `/host/*` | Agenda, cardápio, louça |
 | `/config` `/instalar` | Orientações PWA (não força no 1º login) |
 
+## Login com Google
+
+1. No Supabase: **Authentication → Providers → Google** → Enable.
+2. Crie OAuth no [Google Cloud Console](https://console.cloud.google.com/apis/credentials) (tipo Web).
+3. Authorized redirect URI do Google: a URL que o Supabase mostra no provider (ex. `https://rymthbyhtybqxxblvknp.supabase.co/auth/v1/callback`).
+4. Cole Client ID + Client Secret no Supabase.
+5. Em **Authentication → URL configuration**, inclua:
+   - `http://localhost:5173/**`
+   - `https://app-lagoinha.vercel.app/**`
+6. Rode no SQL Editor: `supabase/schema_google_auth.sql` (nome do perfil via Google).
+
 ## Deploy (Vercel Hobby)
 
 1. Repo: `leoplourenco/app-lagoinha`
