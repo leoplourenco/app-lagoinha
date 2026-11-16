@@ -3,8 +3,8 @@ import { APP_TZ, dayKeySp, formatEventTime, formatSp } from './timezone'
 
 /** Grade fixa da igreja (America/Sao_Paulo). weekday: 0=dom … 6=sáb */
 export const STANDARD_SERVICES = [
-  { id: 'quarta', weekday: 3, hour: 20, minute: 15, title: 'Quarta' },
-  { id: 'sabado', weekday: 6, hour: 19, minute: 30, title: 'Sábado' },
+  { id: 'quarta', weekday: 3, hour: 20, minute: 15, title: 'Culto Fé' },
+  { id: 'sabado', weekday: 6, hour: 19, minute: 30, title: 'Legacy' },
   { id: 'domingo-manha', weekday: 0, hour: 9, minute: 0, title: 'Domingo manhã' },
   { id: 'domingo-noite', weekday: 0, hour: 18, minute: 0, title: 'Domingo noite' },
 ] as const
