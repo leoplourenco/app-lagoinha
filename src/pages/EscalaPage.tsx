@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { EmptyState } from '../components/ui/empty-state'
-import { ServicePicker } from '../components/ServicePicker'
 import { useAuth } from '../context/AuthContext'
 import { useServiceEvents } from '../hooks/useServiceEvents'
 import {
@@ -16,7 +15,7 @@ import {
 } from '../lib/serviceDefaults'
 import { findOrCreateServiceEvent } from '../lib/serviceEvents'
 import { rolesForMinistrySlug } from '../lib/ministryRoles'
-import { canManageMinistry, leaderMemberships, leaderMinistryIds } from '../lib/roles'
+import { canManageMinistry, leaderMemberships } from '../lib/roles'
 import { dayKeySp, formatSp } from '../lib/timezone'
 import { supabase } from '../lib/supabase'
 import { cn } from '../lib/utils'
@@ -31,8 +30,7 @@ type SlotRow = ScheduleSlot & {
 export function EscalaPage() {
   const { user, isLeader, memberships, isAdmin } = useAuth()
   const canManage = isLeader || isAdmin
-  const managedIds = useMemo(() => leaderMinistryIds(memberships), [memberships])
-  const { schedulableEvents, activeEvent, refresh } = useServiceEvents()
+  const { refresh } = useServiceEvents()
   const initialYm = useMemo(() => currentSpYearMonth(), [])
 
   const [mode, setMode] = useState<'padrao' | 'especial'>('padrao')
@@ -41,7 +39,6 @@ export function EscalaPage() {
   const [selectedKeys, setSelectedKeys] = useState<string[]>([])
   const [optionsCache, setOptionsCache] = useState<Record<string, ProposedService>>({})
   const [specialExtras, setSpecialExtras] = useState<ProposedService[]>([])
-  const [eventId, setEventId] = useState<string | null>(null)
   const [selecting, setSelecting] = useState(false)
   const [specialWhen, setSpecialWhen] = useState('')
   const [specialTitle, setSpecialTitle] = useState('')
@@ -120,10 +117,36 @@ export function EscalaPage() {
       .then(({ data }) => setAllMinistries((data as Ministry[]) ?? []))
   }, [isAdmin])
 
-  useEffect(() => {
-    if (canManage) return
-    if (!eventId && activeEvent) setEventId(activeEvent.id)
-  }, [canManage, activeEvent, eventId])
+  async function loadMyUpcomingSlots() {
+    if (!user) {
+      setSlots([])
+      return
+    }
+    const { data, error: err } = await supabase
+      .from('schedule_slots')
+      .select('*, profile:profiles(*), ministry:ministries(*), event:service_events(starts_at, title)')
+      .eq('user_id', user.id)
+      .order('created_at')
+    if (err) {
+      setError(err.message)
+      return
+    }
+    const now = Date.now() - 3 * 60 * 60 * 1000
+    const rows = ((data as SlotRow[]) ?? [])
+      .map((s) => ({
+        ...s,
+        profile: Array.isArray(s.profile) ? s.profile[0] : s.profile,
+        ministry: Array.isArray(s.ministry) ? s.ministry[0] : s.ministry,
+        event: Array.isArray(s.event) ? s.event[0] : s.event,
+      }))
+      .filter((s) => s.event && new Date(s.event.starts_at).getTime() >= now)
+      .sort(
+        (a, b) =>
+          new Date(a.event?.starts_at ?? 0).getTime() -
+          new Date(b.event?.starts_at ?? 0).getTime(),
+      )
+    setSlots(rows)
+  }
 
   useEffect(() => {
     if (!leaderMinistries.length) {
@@ -199,8 +222,8 @@ export function EscalaPage() {
 
   useEffect(() => {
     if (canManage) return
-    void loadSlotsForEvents(eventId ? [eventId] : [])
-  }, [eventId, user, canManage, isAdmin, managedIds.join(',')])
+    void loadMyUpcomingSlots()
+  }, [user?.id, canManage])
 
   useEffect(() => {
     if (ministryId) void loadMembers(ministryId)
@@ -451,8 +474,6 @@ export function EscalaPage() {
       } catch {
         setSlots((prev) => prev.filter((s) => s.id !== slot.id))
       }
-    } else if (eventId) {
-      await loadSlotsForEvents([eventId])
     }
   }
 
@@ -648,14 +669,7 @@ export function EscalaPage() {
             </div>
           ) : null}
         </section>
-      ) : (
-        <ServicePicker
-          events={schedulableEvents}
-          value={eventId}
-          onChange={setEventId}
-          label="Culto / evento por data e horário"
-        />
-      )}
+      ) : null}
 
       {canManage && selectedOptions.length > 0 ? (
         <form onSubmit={addSlot} className="space-y-3 rounded-2xl border border-white/15 bg-white/10 p-4">
@@ -726,25 +740,32 @@ export function EscalaPage() {
         </form>
       ) : null}
 
-      {!canManage && !eventId ? null : slots.length === 0 ? (
-        canManage && selectedOptions.length === 0 ? (
-          <EmptyState
-            title="Marque os cultos"
-            description="Selecione um ou mais cultos padrão (ou um especial) para montar a escala."
-          />
-        ) : (
-          <EmptyState
-            title="Nada nestes cultos ainda"
-            description={
-              canManage
-                ? 'Escolha o voluntário e a função do seu ministério.'
-                : 'Peça ao líder para te colocar na escala.'
-            }
-          />
-        )
-      ) : (
+      {canManage && selectedOptions.length === 0 ? (
+        <EmptyState
+          title="Marque os cultos"
+          description="Selecione um ou mais cultos padrão (ou um especial) para montar a escala."
+        />
+      ) : null}
+
+      {canManage && selectedOptions.length > 0 && slots.length === 0 ? (
+        <EmptyState
+          title="Nada nestes cultos ainda"
+          description="Escolha o voluntário e a função do seu ministério."
+        />
+      ) : null}
+
+      {!canManage && slots.length === 0 ? (
+        <EmptyState
+          title="Você não está em nenhuma escala"
+          description="Quando o líder te colocar, o culto e a função aparecem aqui."
+        />
+      ) : null}
+
+      {slots.length > 0 ? (
         <div className="space-y-2">
-          <p className="text-sm font-medium text-gold">Quem está na escala</p>
+          <p className="text-sm font-medium text-gold">
+            {canManage ? 'Quem está na escala' : 'Suas próximas escalas'}
+          </p>
           {slots.map((slot) => {
             const mine = canManageMinistry(memberships, slot.ministry_id, isAdmin)
             const otherMinistry = canManage && !mine
@@ -759,10 +780,16 @@ export function EscalaPage() {
                 )}
               >
                 <div>
-                  <p className="font-medium">
-                    {slot.profile?.full_name ?? 'Voluntário'}
-                    {slot.user_id === user?.id ? ' (você)' : ''}
-                  </p>
+                  {canManage ? (
+                    <p className="font-medium">
+                      {slot.profile?.full_name ?? 'Voluntário'}
+                      {slot.user_id === user?.id ? ' (você)' : ''}
+                    </p>
+                  ) : (
+                    <p className="font-medium text-white">
+                      {slot.event?.title ?? 'Culto / evento'}
+                    </p>
+                  )}
                   <p className="text-sm text-gold-soft">
                     Função: {slot.role_label || 'sem rótulo'}
                   </p>
@@ -772,7 +799,7 @@ export function EscalaPage() {
                   </p>
                   <p className="text-xs text-muted">
                     {slot.event?.starts_at
-                      ? `${formatSp(slot.event.starts_at, 'EEEE, dd/MM · HH:mm')} · ${slot.event.title}`
+                      ? `${formatSp(slot.event.starts_at, 'EEEE, dd/MM · HH:mm')}${canManage ? ` · ${slot.event.title}` : ''}`
                       : null}
                   </p>
                 </div>
@@ -785,7 +812,7 @@ export function EscalaPage() {
             )
           })}
         </div>
-      )}
+      ) : null}
 
       {message ? (
         <p className="whitespace-pre-line text-sm text-emerald-200">{message}</p>
