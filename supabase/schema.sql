@@ -50,7 +50,8 @@ create table if not exists public.schedule_slots (
   user_id uuid not null references public.profiles (user_id) on delete cascade,
   role_label text not null default '',
   created_at timestamptz not null default now(),
-  unique (event_id, ministry_id, user_id)
+  -- 1 pessoa só pode estar em 1 ministério por culto
+  unique (event_id, user_id)
 );
 
 create table if not exists public.church_checkins (
@@ -353,13 +354,14 @@ create policy service_events_leader_insert on public.service_events
   for insert to authenticated
   with check (public.is_leader_any() or public.is_admin());
 
--- schedule_slots (admin / própria / ministérios que lidera)
+-- schedule_slots (admin / própria / ministérios que lidera / líderes veem tudo p/ colisão)
 drop policy if exists schedule_slots_select on public.schedule_slots;
 create policy schedule_slots_select on public.schedule_slots for select to authenticated
   using (
     public.is_admin()
     or user_id = auth.uid()
     or ministry_id in (select public.my_leader_ministry_ids())
+    or public.is_leader_any()
   );
 
 drop policy if exists schedule_slots_manage on public.schedule_slots;

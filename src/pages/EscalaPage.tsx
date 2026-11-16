@@ -12,6 +12,7 @@ import {
   type ProposedService,
 } from '../lib/serviceDefaults'
 import { findOrCreateServiceEvent } from '../lib/serviceEvents'
+import { rolesForMinistrySlug } from '../lib/ministryRoles'
 import { canManageMinistry, leaderMemberships, leaderMinistryIds } from '../lib/roles'
 import { formatSp } from '../lib/timezone'
 import { supabase } from '../lib/supabase'
@@ -23,8 +24,6 @@ type SlotRow = ScheduleSlot & {
   ministry?: Ministry
   event?: { starts_at: string; title: string }
 }
-
-const SUGGESTED_LABELS = ['porta', 'café', 'recepção']
 
 export function EscalaPage() {
   const { user, isLeader, memberships, isAdmin } = useAuth()
@@ -45,7 +44,7 @@ export function EscalaPage() {
   const [allMinistries, setAllMinistries] = useState<Ministry[]>([])
   const [ministryId, setMinistryId] = useState('')
   const [userId, setUserId] = useState('')
-  const [roleLabel, setRoleLabel] = useState('porta')
+  const [roleLabel, setRoleLabel] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
 
@@ -74,6 +73,17 @@ export function EscalaPage() {
     return leaderMemberships(memberships)
   }, [isAdmin, allMinistries, memberships])
 
+  const currentMinistry = useMemo(() => {
+    const fromLeader = leaderMinistries.find((m) => m.ministry_id === ministryId)?.ministry
+    if (fromLeader) return fromLeader
+    return allMinistries.find((m) => m.id === ministryId) ?? null
+  }, [leaderMinistries, allMinistries, ministryId])
+
+  const roleOptions = useMemo(
+    () => rolesForMinistrySlug(currentMinistry?.slug),
+    [currentMinistry?.slug],
+  )
+
   useEffect(() => {
     if (!isAdmin) return
     void supabase
@@ -100,6 +110,16 @@ export function EscalaPage() {
     }
   }, [leaderMinistries, ministryId])
 
+  useEffect(() => {
+    if (roleOptions.length === 0) {
+      setRoleLabel('')
+      return
+    }
+    if (!roleOptions.includes(roleLabel)) {
+      setRoleLabel(roleOptions[0])
+    }
+  }, [roleOptions, roleLabel])
+
   async function loadSlotsForEvents(ids: string[]) {
     if (!user || ids.length === 0) {
       setSlots([])
@@ -111,13 +131,7 @@ export function EscalaPage() {
       .in('event_id', ids)
       .order('created_at')
 
-    if (isAdmin) {
-      // admin vê tudo
-    } else if (canManage && managedIds.length > 0) {
-      query = query.or(
-        `ministry_id.in.(${managedIds.join(',')}),user_id.eq.${user.id}`,
-      )
-    } else {
+    if (!canManage) {
       query = query.eq('user_id', user.id)
     }
 
@@ -126,23 +140,25 @@ export function EscalaPage() {
       setError(err.message)
       return
     }
+
+    const rows = ((data as SlotRow[]) ?? []).map((s) => ({
+      ...s,
+      profile: Array.isArray(s.profile) ? s.profile[0] : s.profile,
+      ministry: Array.isArray(s.ministry) ? s.ministry[0] : s.ministry,
+      event: Array.isArray(s.event) ? s.event[0] : s.event,
+    }))
+
     setSlots(
-      ((data as SlotRow[]) ?? [])
-        .map((s) => ({
-          ...s,
-          profile: Array.isArray(s.profile) ? s.profile[0] : s.profile,
-          ministry: Array.isArray(s.ministry) ? s.ministry[0] : s.ministry,
-          event: Array.isArray(s.event) ? s.event[0] : s.event,
-        }))
-        .sort(
-          (a, b) =>
-            new Date(a.event?.starts_at ?? 0).getTime() -
-            new Date(b.event?.starts_at ?? 0).getTime(),
-        ),
+      rows.sort(
+        (a, b) =>
+          new Date(a.event?.starts_at ?? 0).getTime() -
+          new Date(b.event?.starts_at ?? 0).getTime(),
+      ),
     )
   }
 
   async function loadMembers(mid: string) {
+    // Só voluntários DESTE ministério
     const { data } = await supabase
       .from('ministry_members')
       .select('user_id, profile:profiles(*)')
@@ -152,13 +168,11 @@ export function EscalaPage() {
         .map((row) => (Array.isArray(row.profile) ? row.profile[0] : row.profile))
         .filter(Boolean) as Profile[],
     )
+    setUserId('')
   }
 
   useEffect(() => {
-    if (canManage) {
-      // lista é recarregada após escalar; seleção sem event ids ainda
-      return
-    }
+    if (canManage) return
     void loadSlotsForEvents(eventId ? [eventId] : [])
   }, [eventId, user, canManage, isAdmin, managedIds.join(',')])
 
@@ -237,35 +251,116 @@ export function EscalaPage() {
       setError('Você só pode montar escala nos ministérios que lidera.')
       return
     }
+    if (roleOptions.length > 0 && !roleOptions.includes(roleLabel)) {
+      setError('Escolha uma função do seu ministério.')
+      return
+    }
+    if (!roleLabel.trim()) {
+      setError('Escolha a função na escala.')
+      return
+    }
 
     setSelecting(true)
     try {
       const eventIds = await resolveEventIds(selectedOptions)
-      const rows = eventIds.map((eid) => ({
-        event_id: eid,
-        ministry_id: ministryId,
-        user_id: userId,
-        role_label: roleLabel.trim() || 'função',
+
+      // Colisão: pessoa já escalada naquele culto (qualquer ministério)
+      const { data: existing, error: existErr } = await supabase
+        .from('schedule_slots')
+        .select('id, event_id, ministry_id, role_label, ministry:ministries(name)')
+        .eq('user_id', userId)
+        .in('event_id', eventIds)
+
+      if (existErr) {
+        setError(existErr.message)
+        return
+      }
+
+      type ExistingRow = {
+        id: string
+        event_id: string
+        ministry_id: string
+        role_label: string
+        ministry?: { name: string } | { name: string }[]
+      }
+
+      const existingRows = ((existing as ExistingRow[]) ?? []).map((row) => ({
+        ...row,
+        ministry: Array.isArray(row.ministry) ? row.ministry[0] : row.ministry,
       }))
 
-      const { error: err } = await supabase.from('schedule_slots').upsert(rows, {
-        onConflict: 'event_id,ministry_id,user_id',
-        ignoreDuplicates: false,
+      const byEvent = new Map(existingRows.map((r) => [r.event_id, r]))
+      const toInsert: {
+        event_id: string
+        ministry_id: string
+        user_id: string
+        role_label: string
+      }[] = []
+      const toUpdate: { id: string }[] = []
+      const blocked: string[] = []
+
+      selectedOptions.forEach((opt, idx) => {
+        const eid = eventIds[idx]
+        const hit = byEvent.get(eid)
+        const label = `${opt.dayLabel} · ${opt.timeLabel}`
+        if (!hit) {
+          toInsert.push({
+            event_id: eid,
+            ministry_id: ministryId,
+            user_id: userId,
+            role_label: roleLabel.trim(),
+          })
+          return
+        }
+        if (hit.ministry_id === ministryId) {
+          toUpdate.push({ id: hit.id })
+          return
+        }
+        blocked.push(
+          `${label} — já em ${hit.ministry?.name ?? 'outro ministério'} (${hit.role_label})`,
+        )
       })
 
-      if (err) {
-        // unique pode exigir update do rótulo; se upsert falhar, tenta insert e ignora duplicata
-        const { error: insertErr } = await supabase.from('schedule_slots').insert(rows)
-        if (insertErr && !insertErr.message.toLowerCase().includes('duplicate')) {
-          setError(insertErr.message)
+      if (toUpdate.length > 0) {
+        await supabase
+          .from('schedule_slots')
+          .update({ role_label: roleLabel.trim() })
+          .in(
+            'id',
+            toUpdate.map((r) => r.id),
+          )
+      }
+
+      if (toInsert.length > 0) {
+        const { error: insertErr } = await supabase.from('schedule_slots').insert(toInsert)
+        if (insertErr) {
+          if (insertErr.message.toLowerCase().includes('duplicate') || insertErr.code === '23505') {
+            setError(
+              'Essa pessoa já está escalada em um dos cultos por outro ministério. Escolha outras datas.',
+            )
+          } else {
+            setError(insertErr.message)
+          }
           return
         }
       }
 
       const volunteer = members.find((m) => m.user_id === userId)?.full_name ?? 'Voluntário'
-      setMessage(
-        `${volunteer} escalado em ${selectedOptions.length} culto${selectedOptions.length > 1 ? 's' : ''}.`,
-      )
+      const ok = toInsert.length + toUpdate.length
+      const parts = [
+        ok > 0
+          ? `${volunteer}: ${ok} culto${ok > 1 ? 's' : ''} em ${currentMinistry?.name ?? 'seu ministério'} · ${roleLabel}`
+          : null,
+        blocked.length > 0 ? `Bloqueado(s): ${blocked.join(' | ')}` : null,
+      ].filter(Boolean)
+
+      if (ok === 0 && blocked.length > 0) {
+        setError(blocked.join('\n'))
+      } else {
+        setMessage(parts.join('\n'))
+        if (blocked.length > 0) setError(`${blocked.length} culto(s) já ocupados por outro ministério.`)
+      }
+
       await refresh()
       await loadSlotsForEvents(eventIds)
     } catch (e) {
@@ -277,7 +372,7 @@ export function EscalaPage() {
 
   async function removeSlot(slot: SlotRow) {
     if (!canManageMinistry(memberships, slot.ministry_id, isAdmin)) {
-      setError('Você só pode remover escala dos ministérios que lidera.')
+      setError('Você só remove escala do ministério que lidera.')
       return
     }
     await supabase.from('schedule_slots').delete().eq('id', slot.id)
@@ -317,7 +412,7 @@ export function EscalaPage() {
         <h2 className="font-brand text-2xl">Escala</h2>
         <p className="mt-1 text-sm text-muted">
           {canManage
-            ? 'Marque vários cultos do mês e encaixe o mesmo voluntário de uma vez.'
+            ? 'Só funções do seu ministério. A mesma pessoa não pode ficar em dois ministérios no mesmo culto.'
             : 'Veja em qual data/horário você está escalado.'}
         </p>
       </div>
@@ -476,9 +571,12 @@ export function EscalaPage() {
       {canManage && selectedOptions.length > 0 ? (
         <form onSubmit={addSlot} className="space-y-3 rounded-2xl border border-white/15 bg-white/10 p-4">
           <p className="font-semibold">
-            Adicionar voluntário em {selectedOptions.length} culto
-            {selectedOptions.length > 1 ? 's' : ''}
+            Escala · {currentMinistry?.name ?? 'seu ministério'}
           </p>
+          <p className="text-xs text-muted">
+            Só funções deste ministério. Voluntários listados são da equipe dele.
+          </p>
+
           {leaderMinistries.length > 1 ? (
             <select
               className="h-11 w-full rounded-xl border border-white/15 bg-panel-2 px-3 text-sm"
@@ -492,40 +590,49 @@ export function EscalaPage() {
               ))}
             </select>
           ) : null}
+
           <select
             className="h-11 w-full rounded-xl border border-white/15 bg-panel-2 px-3 text-sm"
             value={userId}
             onChange={(e) => setUserId(e.target.value)}
           >
-            <option value="">Voluntário</option>
+            <option value="">Voluntário do ministério</option>
             {members.map((m) => (
               <option key={m.user_id} value={m.user_id}>
                 {m.full_name}
               </option>
             ))}
           </select>
-          <div className="flex flex-wrap gap-2">
-            {SUGGESTED_LABELS.map((label) => (
-              <Button
-                key={label}
-                type="button"
-                size="sm"
-                variant={roleLabel === label ? 'default' : 'outline'}
-                onClick={() => setRoleLabel(label)}
-              >
-                {label}
-              </Button>
-            ))}
+
+          <div>
+            <p className="mb-2 text-xs uppercase tracking-wide text-gold">Função</p>
+            {roleOptions.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {roleOptions.map((label) => (
+                  <Button
+                    key={label}
+                    type="button"
+                    size="sm"
+                    variant={roleLabel === label ? 'default' : 'outline'}
+                    onClick={() => setRoleLabel(label)}
+                  >
+                    {label}
+                  </Button>
+                ))}
+              </div>
+            ) : (
+              <Input
+                value={roleLabel}
+                onChange={(e) => setRoleLabel(e.target.value)}
+                placeholder="Função na escala"
+              />
+            )}
           </div>
-          <Input
-            value={roleLabel}
-            onChange={(e) => setRoleLabel(e.target.value)}
-            placeholder="Função na escala"
-          />
+
           <Button type="submit" className="w-full" disabled={selecting}>
             {selecting
               ? 'Escalando…'
-              : `Escalar neste${selectedOptions.length > 1 ? 's' : ''} ${selectedOptions.length} culto${selectedOptions.length > 1 ? 's' : ''}`}
+              : `Escalar em ${selectedOptions.length} culto${selectedOptions.length > 1 ? 's' : ''}`}
           </Button>
         </form>
       ) : null}
@@ -541,7 +648,7 @@ export function EscalaPage() {
             title="Nada nestes cultos ainda"
             description={
               canManage
-                ? 'Escolha o voluntário acima para escalar em todos os marcados.'
+                ? 'Escolha o voluntário e a função do seu ministério.'
                 : 'Peça ao líder para te colocar na escala.'
             }
           />
@@ -549,37 +656,51 @@ export function EscalaPage() {
       ) : (
         <div className="space-y-2">
           <p className="text-sm font-medium text-gold">Quem está na escala</p>
-          {slots.map((slot) => (
-            <div
-              key={slot.id}
-              className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/5 px-3 py-3"
-            >
-              <div>
-                <p className="font-medium">
-                  {slot.profile?.full_name ?? 'Voluntário'}
-                  {slot.user_id === user?.id ? ' (você)' : ''}
-                </p>
-                <p className="text-sm text-muted">
-                  {slot.ministry?.name} · {slot.role_label || 'sem rótulo'}
-                </p>
-                <p className="text-xs text-muted">
-                  {slot.event?.starts_at
-                    ? `${formatSp(slot.event.starts_at, 'EEEE, dd/MM · HH:mm')} · ${slot.event.title}`
-                    : null}
-                </p>
+          {slots.map((slot) => {
+            const mine = canManageMinistry(memberships, slot.ministry_id, isAdmin)
+            const otherMinistry = canManage && !mine
+            return (
+              <div
+                key={slot.id}
+                className={cn(
+                  'flex items-center justify-between gap-3 rounded-xl border px-3 py-3',
+                  otherMinistry
+                    ? 'border-rose-400/30 bg-rose-500/10'
+                    : 'border-white/10 bg-white/5',
+                )}
+              >
+                <div>
+                  <p className="font-medium">
+                    {slot.profile?.full_name ?? 'Voluntário'}
+                    {slot.user_id === user?.id ? ' (você)' : ''}
+                  </p>
+                  <p className="text-sm text-muted">
+                    {slot.ministry?.name} · {slot.role_label || 'sem rótulo'}
+                    {otherMinistry ? ' · outro ministério' : ''}
+                  </p>
+                  <p className="text-xs text-muted">
+                    {slot.event?.starts_at
+                      ? `${formatSp(slot.event.starts_at, 'EEEE, dd/MM · HH:mm')} · ${slot.event.title}`
+                      : null}
+                  </p>
+                </div>
+                {mine ? (
+                  <Button size="sm" variant="ghost" onClick={() => void removeSlot(slot)}>
+                    Remover
+                  </Button>
+                ) : null}
               </div>
-              {canManageMinistry(memberships, slot.ministry_id, isAdmin) ? (
-                <Button size="sm" variant="ghost" onClick={() => void removeSlot(slot)}>
-                  Remover
-                </Button>
-              ) : null}
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 
-      {message ? <p className="text-sm text-emerald-200">{message}</p> : null}
-      {error ? <p className="text-sm text-rose-200">{error}</p> : null}
+      {message ? (
+        <p className="whitespace-pre-line text-sm text-emerald-200">{message}</p>
+      ) : null}
+      {error ? (
+        <p className="whitespace-pre-line text-sm text-rose-200">{error}</p>
+      ) : null}
     </div>
   )
 }
