@@ -1,8 +1,9 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { EmptyState } from '../components/ui/empty-state'
 import { useAuth } from '../context/AuthContext'
+import { canManageMinistry, leaderMemberships } from '../lib/roles'
 import { supabase } from '../lib/supabase'
 import type { Ministry, MinistryMember, Profile } from '../types/database'
 
@@ -11,19 +12,23 @@ type MemberRow = MinistryMember & { profile?: Profile }
 export function EquipePage() {
   const { memberships, isAdmin } = useAuth()
   const [allMinistries, setAllMinistries] = useState<Ministry[]>([])
-  const leaderMinistries = isAdmin
-    ? allMinistries.map((m) => ({
-        ministry_id: m.id,
-        ministry: m,
-        role: 'leader' as const,
-      }))
-    : memberships.filter((m) => m.role === 'leader')
   const [ministryId, setMinistryId] = useState('')
   const [members, setMembers] = useState<MemberRow[]>([])
   const [query, setQuery] = useState('')
   const [candidates, setCandidates] = useState<Profile[]>([])
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  const leaderMinistries = useMemo(() => {
+    if (isAdmin) {
+      return allMinistries.map((m) => ({
+        ministry_id: m.id,
+        ministry: m,
+        role: 'leader' as const,
+      }))
+    }
+    return leaderMemberships(memberships)
+  }, [isAdmin, allMinistries, memberships])
 
   useEffect(() => {
     if (!isAdmin) return
@@ -33,20 +38,31 @@ export function EquipePage() {
       .eq('active', true)
       .order('name')
       .then(({ data }) => {
-        const rows = (data as Ministry[]) ?? []
-        setAllMinistries(rows)
-        if (!ministryId && rows[0]) setMinistryId(rows[0].id)
+        setAllMinistries((data as Ministry[]) ?? [])
       })
   }, [isAdmin])
 
   useEffect(() => {
-    if (!isAdmin && leaderMinistries[0] && !ministryId) {
+    if (!leaderMinistries.length) {
+      if (ministryId) setMinistryId('')
+      return
+    }
+    const stillValid = leaderMinistries.some((m) => m.ministry_id === ministryId)
+    if (!ministryId || !stillValid) {
       setMinistryId(leaderMinistries[0].ministry_id)
     }
-  }, [isAdmin, leaderMinistries, ministryId])
+  }, [leaderMinistries, ministryId])
 
   async function loadMembers() {
-    if (!ministryId) return
+    if (!ministryId) {
+      setMembers([])
+      return
+    }
+    if (!canManageMinistry(memberships, ministryId, isAdmin)) {
+      setError('Você só pode gerir a equipe dos ministérios que lidera.')
+      setMembers([])
+      return
+    }
     const { data, error: err } = await supabase
       .from('ministry_members')
       .select('*, profile:profiles(*)')
@@ -66,7 +82,7 @@ export function EquipePage() {
 
   useEffect(() => {
     void loadMembers()
-  }, [ministryId])
+  }, [ministryId, isAdmin, memberships])
 
   async function searchCandidates() {
     const q = query.trim().toLowerCase()
@@ -84,6 +100,10 @@ export function EquipePage() {
   async function addMember(profile: Profile, role: 'volunteer' | 'leader' = 'volunteer') {
     setError(null)
     setMessage(null)
+    if (!canManageMinistry(memberships, ministryId, isAdmin)) {
+      setError('Você só pode adicionar pessoas nos ministérios que lidera.')
+      return
+    }
     const { error: err } = await supabase.from('ministry_members').insert({
       ministry_id: ministryId,
       user_id: profile.user_id,
@@ -100,12 +120,20 @@ export function EquipePage() {
   }
 
   async function setRole(member: MemberRow, role: 'volunteer' | 'leader') {
+    if (!canManageMinistry(memberships, member.ministry_id, isAdmin)) {
+      setError('Você só pode alterar papéis nos ministérios que lidera.')
+      return
+    }
     await supabase.from('ministry_members').update({ role }).eq('id', member.id)
     await loadMembers()
   }
 
-  async function removeMember(id: string) {
-    await supabase.from('ministry_members').delete().eq('id', id)
+  async function removeMember(member: MemberRow) {
+    if (!canManageMinistry(memberships, member.ministry_id, isAdmin)) {
+      setError('Você só pode remover pessoas dos ministérios que lidera.')
+      return
+    }
+    await supabase.from('ministry_members').delete().eq('id', member.id)
     await loadMembers()
   }
 
@@ -114,12 +142,25 @@ export function EquipePage() {
     void searchCandidates()
   }
 
+  if (!isAdmin && leaderMinistries.length === 0) {
+    return (
+      <div className="space-y-5">
+        <h2 className="font-brand text-2xl">Equipe</h2>
+        <EmptyState
+          title="Sem ministério para gerir"
+          description="Você precisa ser líder de pelo menos um ministério."
+        />
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-5">
       <div>
         <h2 className="font-brand text-2xl">Equipe</h2>
         <p className="mt-1 text-sm text-muted">
-          Só dá para adicionar quem já se cadastrou no app.
+          Só dá para adicionar quem já se cadastrou no app. Você gerencia apenas o(s)
+          ministério(s) que lidera.
         </p>
       </div>
 
@@ -193,7 +234,7 @@ export function EquipePage() {
                 >
                   {m.role === 'leader' ? 'Tornar voluntário' : 'Tornar líder'}
                 </Button>
-                <Button size="sm" variant="ghost" onClick={() => void removeMember(m.id)}>
+                <Button size="sm" variant="ghost" onClick={() => void removeMember(m)}>
                   Remover
                 </Button>
               </div>

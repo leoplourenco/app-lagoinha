@@ -1,10 +1,11 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { EmptyState } from '../components/ui/empty-state'
 import { ServicePicker } from '../components/ServicePicker'
 import { useAuth } from '../context/AuthContext'
 import { useServiceEvents } from '../hooks/useServiceEvents'
+import { canManageMinistry, leaderMemberships, leaderMinistryIds } from '../lib/roles'
 import { formatSp } from '../lib/timezone'
 import { supabase } from '../lib/supabase'
 import type { Ministry, Profile, ScheduleSlot } from '../types/database'
@@ -19,6 +20,7 @@ const SUGGESTED_LABELS = ['porta', 'café', 'recepção']
 export function EscalaPage() {
   const { user, isLeader, memberships, isAdmin } = useAuth()
   const canManage = isLeader || isAdmin
+  const managedIds = useMemo(() => leaderMinistryIds(memberships), [memberships])
   const { todayEvents, upcomingEvents, activeEvent } = useServiceEvents()
   const events = todayEvents.length > 0 ? todayEvents : upcomingEvents
   const [eventId, setEventId] = useState<string | null>(null)
@@ -30,13 +32,16 @@ export function EscalaPage() {
   const [roleLabel, setRoleLabel] = useState('porta')
   const [error, setError] = useState<string | null>(null)
 
-  const leaderMinistries = isAdmin
-    ? allMinistries.map((m) => ({
+  const leaderMinistries = useMemo(() => {
+    if (isAdmin) {
+      return allMinistries.map((m) => ({
         ministry_id: m.id,
         ministry: m,
         role: 'leader' as const,
       }))
-    : memberships.filter((m) => m.role === 'leader')
+    }
+    return leaderMemberships(memberships)
+  }, [isAdmin, allMinistries, memberships])
 
   useEffect(() => {
     if (!isAdmin) return
@@ -53,20 +58,32 @@ export function EscalaPage() {
   }, [activeEvent, eventId])
 
   useEffect(() => {
-    if (leaderMinistries[0] && !ministryId) {
+    if (!leaderMinistries.length) {
+      if (ministryId) setMinistryId('')
+      return
+    }
+    const stillValid = leaderMinistries.some((m) => m.ministry_id === ministryId)
+    if (!ministryId || !stillValid) {
       setMinistryId(leaderMinistries[0].ministry_id)
     }
   }, [leaderMinistries, ministryId])
 
   async function loadSlots() {
-    if (!eventId) return
+    if (!eventId || !user) return
     let query = supabase
       .from('schedule_slots')
       .select('*, profile:profiles(*), ministry:ministries(*)')
       .eq('event_id', eventId)
       .order('created_at')
 
-    if (!canManage && user) {
+    if (isAdmin) {
+      // admin vê a escala completa do culto
+    } else if (canManage && managedIds.length > 0) {
+      // líder: só ministérios que lidera + slots pessoais (ex.: voluntário em outro)
+      query = query.or(
+        `ministry_id.in.(${managedIds.join(',')}),user_id.eq.${user.id}`,
+      )
+    } else {
       query = query.eq('user_id', user.id)
     }
 
@@ -99,7 +116,7 @@ export function EscalaPage() {
 
   useEffect(() => {
     void loadSlots()
-  }, [eventId, user, canManage])
+  }, [eventId, user, canManage, isAdmin, managedIds.join(',')])
 
   useEffect(() => {
     if (ministryId) void loadMembers(ministryId)
@@ -110,6 +127,10 @@ export function EscalaPage() {
     setError(null)
     if (!eventId || !ministryId || !userId) {
       setError('Escolha culto, ministério e voluntário.')
+      return
+    }
+    if (!canManageMinistry(memberships, ministryId, isAdmin)) {
+      setError('Você só pode montar escala nos ministérios que lidera.')
       return
     }
     const { error: err } = await supabase.from('schedule_slots').insert({
@@ -126,8 +147,12 @@ export function EscalaPage() {
     await loadSlots()
   }
 
-  async function removeSlot(id: string) {
-    await supabase.from('schedule_slots').delete().eq('id', id)
+  async function removeSlot(slot: SlotRow) {
+    if (!canManageMinistry(memberships, slot.ministry_id, isAdmin)) {
+      setError('Você só pode remover escala dos ministérios que lidera.')
+      return
+    }
+    await supabase.from('schedule_slots').delete().eq('id', slot.id)
     await loadSlots()
   }
 
@@ -216,8 +241,8 @@ export function EscalaPage() {
                   {eventId ? formatSp(events.find((e) => e.id === eventId)?.starts_at ?? '') : ''}
                 </p>
               </div>
-              {canManage ? (
-                <Button size="sm" variant="ghost" onClick={() => void removeSlot(slot.id)}>
+              {canManageMinistry(memberships, slot.ministry_id, isAdmin) ? (
+                <Button size="sm" variant="ghost" onClick={() => void removeSlot(slot)}>
                   Remover
                 </Button>
               ) : null}

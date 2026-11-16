@@ -211,6 +211,30 @@ as $$
   select id from public.ministries where slug = p_slug limit 1;
 $$;
 
+create or replace function public.my_ministry_ids()
+returns setof uuid
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select ministry_id
+  from public.ministry_members
+  where user_id = auth.uid();
+$$;
+
+create or replace function public.my_leader_ministry_ids()
+returns setof uuid
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select ministry_id
+  from public.ministry_members
+  where user_id = auth.uid() and role = 'leader';
+$$;
+
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
@@ -288,19 +312,26 @@ create policy profiles_update_self on public.profiles for update to authenticate
   using (user_id = auth.uid() or public.is_admin())
   with check (user_id = auth.uid() or public.is_admin());
 
--- ministries
+-- ministries (admin vê todos; demais só os que participam)
 drop policy if exists ministries_select on public.ministries;
 create policy ministries_select on public.ministries for select to authenticated
-  using (true);
+  using (
+    public.is_admin()
+    or id in (select public.my_ministry_ids())
+  );
 
 drop policy if exists ministries_admin on public.ministries;
 create policy ministries_admin on public.ministries for all to authenticated
   using (public.is_admin()) with check (public.is_admin());
 
--- ministry_members
+-- ministry_members (admin / própria linha / colegas do mesmo ministério)
 drop policy if exists ministry_members_select on public.ministry_members;
 create policy ministry_members_select on public.ministry_members for select to authenticated
-  using (true);
+  using (
+    public.is_admin()
+    or user_id = auth.uid()
+    or ministry_id in (select public.my_ministry_ids())
+  );
 
 drop policy if exists ministry_members_manage on public.ministry_members;
 create policy ministry_members_manage on public.ministry_members for all to authenticated
@@ -316,10 +347,14 @@ drop policy if exists service_events_admin on public.service_events;
 create policy service_events_admin on public.service_events for all to authenticated
   using (public.is_admin()) with check (public.is_admin());
 
--- schedule_slots
+-- schedule_slots (admin / própria / ministérios que lidera)
 drop policy if exists schedule_slots_select on public.schedule_slots;
 create policy schedule_slots_select on public.schedule_slots for select to authenticated
-  using (true);
+  using (
+    public.is_admin()
+    or user_id = auth.uid()
+    or ministry_id in (select public.my_leader_ministry_ids())
+  );
 
 drop policy if exists schedule_slots_manage on public.schedule_slots;
 create policy schedule_slots_manage on public.schedule_slots for all to authenticated
