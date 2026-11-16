@@ -16,6 +16,7 @@ import { AdminMinisteriosPage } from './pages/admin/AdminMinisteriosPage'
 import { AdminUsuariosPage } from './pages/admin/AdminUsuariosPage'
 import { AdminFerramentasPage } from './pages/admin/AdminFerramentasPage'
 import { ConfigPage } from './pages/ConfigPage'
+import { DisponibilidadePage } from './pages/DisponibilidadePage'
 import { InstalarPage } from './pages/InstalarPage'
 import { RelatoriosPage } from './pages/RelatoriosPage'
 import { SalaHubPage } from './pages/sala/SalaHubPage'
@@ -66,6 +67,7 @@ export default function App() {
                 <Route path="/" element={<HomePage />} />
                 <Route path="/checkin" element={<CheckinPage />} />
                 <Route path="/escala" element={<EscalaPage />} />
+                <Route path="/disponibilidade" element={<DisponibilidadePage />} />
                 <Route path="/config" element={<ConfigPage />} />
               </Route>
             </Route>

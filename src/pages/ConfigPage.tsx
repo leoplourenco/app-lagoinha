@@ -151,6 +151,21 @@ export function ConfigPage() {
         </Button>
       </form>
 
+      {!isAdmin ? (
+        <section className="rounded-2xl border border-white/10 bg-panel p-4">
+          <p className="font-semibold">Disponibilidade</p>
+          <p className="mt-1 text-sm text-muted">
+            Avise os dias em que você não pode servir na escala.
+          </p>
+          <Link
+            to="/disponibilidade"
+            className="mt-3 inline-block text-sm font-semibold text-gold underline"
+          >
+            Abrir minhas datas →
+          </Link>
+        </section>
+      ) : null}
+
       <section className="rounded-2xl border border-white/10 bg-panel p-4">
         <p className="font-semibold">Como instalar o app</p>
         <p className="mt-1 text-sm text-muted">

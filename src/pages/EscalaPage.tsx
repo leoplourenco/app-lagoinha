@@ -17,7 +17,7 @@ import {
 import { findOrCreateServiceEvent } from '../lib/serviceEvents'
 import { rolesForMinistrySlug } from '../lib/ministryRoles'
 import { canManageMinistry, leaderMemberships, leaderMinistryIds } from '../lib/roles'
-import { formatSp } from '../lib/timezone'
+import { dayKeySp, formatSp } from '../lib/timezone'
 import { supabase } from '../lib/supabase'
 import { cn } from '../lib/utils'
 import type { Ministry, Profile, ScheduleSlot } from '../types/database'
@@ -304,6 +304,26 @@ export function EscalaPage() {
     try {
       const eventIds = await resolveEventIds(selectedOptions)
 
+      // Indisponibilidade marcada pelo voluntário
+      const dayKeys = [...new Set(selectedOptions.map((o) => dayKeySp(o.startsAtIso)))]
+      const { data: unavail, error: unavailErr } = await supabase
+        .from('volunteer_unavailability')
+        .select('unavailable_on, note')
+        .eq('user_id', userId)
+        .in('unavailable_on', dayKeys)
+
+      if (unavailErr) {
+        setError(unavailErr.message)
+        return
+      }
+
+      const unavailByDay = new Map(
+        ((unavail as { unavailable_on: string; note: string | null }[]) ?? []).map((u) => [
+          u.unavailable_on,
+          u.note,
+        ]),
+      )
+
       // Colisão: pessoa já escalada naquele culto (qualquer ministério)
       const { data: existing, error: existErr } = await supabase
         .from('schedule_slots')
@@ -343,6 +363,14 @@ export function EscalaPage() {
         const eid = eventIds[idx]
         const hit = byEvent.get(eid)
         const label = `${opt.dayLabel} · ${opt.timeLabel}`
+        const day = dayKeySp(opt.startsAtIso)
+        if (unavailByDay.has(day)) {
+          const note = unavailByDay.get(day)
+          blocked.push(
+            `${label} — indisponível${note ? ` (${note})` : ''}`,
+          )
+          return
+        }
         if (!hit) {
           toInsert.push({
             event_id: eid,
@@ -735,8 +763,11 @@ export function EscalaPage() {
                     {slot.profile?.full_name ?? 'Voluntário'}
                     {slot.user_id === user?.id ? ' (você)' : ''}
                   </p>
+                  <p className="text-sm text-gold-soft">
+                    Função: {slot.role_label || 'sem rótulo'}
+                  </p>
                   <p className="text-sm text-muted">
-                    {slot.ministry?.name} · {slot.role_label || 'sem rótulo'}
+                    {slot.ministry?.name}
                     {otherMinistry ? ' · outro ministério' : ''}
                   </p>
                   <p className="text-xs text-muted">

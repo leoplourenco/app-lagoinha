@@ -30,7 +30,11 @@ export function HomePage() {
     isLeader,
   } = useAuth()
   const { activeEvent, todayEvents, loading } = useServiceEvents()
-  const [slots, setSlots] = useState<(ScheduleSlot & { ministry?: { name: string } })[]>([])
+  type MySlot = ScheduleSlot & {
+    ministry?: { name: string }
+    event?: { starts_at: string; title: string }
+  }
+  const [slots, setSlots] = useState<MySlot[]>([])
   const [checkedIn, setCheckedIn] = useState(false)
   const [showInstall, setShowInstall] = useState(
     () => localStorage.getItem(DISMISS_KEY) !== '1',
@@ -40,30 +44,46 @@ export function HomePage() {
   const leaderMinistries = leaderMinistryNames(memberships)
 
   useEffect(() => {
-    if (isAdmin || !user || !activeEvent) return
+    if (isAdmin || !user) return
     void (async () => {
-      const [{ data: schedule }, { data: checkin }] = await Promise.all([
+      const [{ data: schedule }, checkinRes] = await Promise.all([
         supabase
           .from('schedule_slots')
-          .select('*, ministry:ministries(name)')
-          .eq('user_id', user.id)
-          .eq('event_id', activeEvent.id),
-        supabase
-          .from('church_checkins')
-          .select('id')
-          .eq('user_id', user.id)
-          .eq('event_id', activeEvent.id)
-          .maybeSingle(),
+          .select('*, ministry:ministries(name), event:service_events(starts_at, title)')
+          .eq('user_id', user.id),
+        activeEvent
+          ? supabase
+              .from('church_checkins')
+              .select('id')
+              .eq('user_id', user.id)
+              .eq('event_id', activeEvent.id)
+              .maybeSingle()
+          : Promise.resolve({ data: null }),
       ])
-      setSlots(
-        ((schedule as (ScheduleSlot & { ministry?: { name: string } | { name: string }[] })[]) ?? []).map(
-          (s) => ({
-            ...s,
-            ministry: Array.isArray(s.ministry) ? s.ministry[0] : s.ministry,
-          }),
-        ),
+
+      const now = Date.now() - 3 * 60 * 60 * 1000
+      const rows = (
+        (schedule as (ScheduleSlot & {
+          ministry?: { name: string } | { name: string }[]
+          event?:
+            | { starts_at: string; title: string }
+            | { starts_at: string; title: string }[]
+        })[]) ?? []
       )
-      setCheckedIn(Boolean(checkin))
+        .map((s) => ({
+          ...s,
+          ministry: Array.isArray(s.ministry) ? s.ministry[0] : s.ministry,
+          event: Array.isArray(s.event) ? s.event[0] : s.event,
+        }))
+        .filter((s) => s.event && new Date(s.event.starts_at).getTime() >= now)
+        .sort(
+          (a, b) =>
+            new Date(a.event!.starts_at).getTime() - new Date(b.event!.starts_at).getTime(),
+        )
+        .slice(0, 8)
+
+      setSlots(rows)
+      setCheckedIn(Boolean(checkinRes.data))
     })()
   }, [user, activeEvent, isAdmin])
 
@@ -237,6 +257,12 @@ export function HomePage() {
             {isHostMember ? (
               <ActionCard to="/host" title="Host" hint="Agenda e cardápio" icon={Users} />
             ) : null}
+            <ActionCard
+              to="/disponibilidade"
+              title="Disponibilidade"
+              hint="Dias que não posso"
+              icon={CalendarDays}
+            />
           </div>
         </section>
       ) : (
@@ -255,8 +281,14 @@ export function HomePage() {
             <ActionCard
               to="/escala"
               title="Minha escala"
-              hint="Função no culto"
+              hint="Culto e função"
               icon={ClipboardList}
+            />
+            <ActionCard
+              to="/disponibilidade"
+              title="Disponibilidade"
+              hint="Dias que não posso"
+              icon={CalendarDays}
             />
             {isSalaMember ? (
               <ActionCard to="/sala" title="Sala" hint="Operação do culto" icon={Users} />
@@ -275,7 +307,7 @@ export function HomePage() {
       )}
 
       <section className="space-y-3">
-        <h3 className="font-brand text-xl text-gold">Minha escala neste culto</h3>
+        <h3 className="font-brand text-xl text-gold">Minha escala</h3>
         {slots.length === 0 ? (
           <EmptyState
             title="Você ainda não está na escala"
@@ -291,13 +323,26 @@ export function HomePage() {
               key={slot.id}
               className="rounded-2xl border border-white/10 bg-panel px-4 py-3"
             >
-              <p className="font-medium">{slot.ministry?.name ?? 'Ministério'}</p>
-              <p className="text-sm text-muted">Função: {slot.role_label || 'sem rótulo'}</p>
+              <p className="font-medium text-white">
+                {slot.event?.title ?? 'Culto / evento'}
+              </p>
+              <p className="text-sm text-muted">
+                {slot.event?.starts_at
+                  ? formatSp(slot.event.starts_at, "EEEE, dd/MM · HH:mm")
+                  : null}
+              </p>
+              <p className="mt-1 text-sm text-gold-soft">
+                Função: {slot.role_label || 'sem rótulo'}
+              </p>
+              <p className="text-xs text-muted">
+                {slot.ministry?.name ?? 'Ministério'}
+              </p>
             </div>
           ))
         )}
       </section>
 
+      <QuickLink to="/disponibilidade" label="Marcar dias indisponíveis" />
       <QuickLink to="/config" label="Perfil e config" />
     </div>
   )

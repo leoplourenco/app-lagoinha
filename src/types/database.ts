@@ -46,6 +46,14 @@ export type ScheduleSlot = {
   created_at: string
 }
 
+export type VolunteerUnavailability = {
+  id: string
+  user_id: string
+  unavailable_on: string
+  note: string | null
+  created_at: string
+}
+
 export type ChurchCheckin = {
   id: string
   user_id: string
