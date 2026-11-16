@@ -9,6 +9,13 @@ if (!url || !anon) {
   )
 }
 
-export const supabase = createClient(url || 'https://placeholder.supabase.co', anon || 'placeholder')
+export const supabase = createClient(url || 'https://placeholder.supabase.co', anon || 'placeholder', {
+  auth: {
+    flowType: 'pkce',
+    detectSessionInUrl: true,
+    persistSession: true,
+    autoRefreshToken: true,
+  },
+})
 
 export const hasSupabaseConfig = Boolean(url && anon)

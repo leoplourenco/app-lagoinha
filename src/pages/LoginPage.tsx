@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { Eye, EyeOff, Lock, User } from 'lucide-react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { BrandMark } from '../components/brand/BrandMark'
@@ -7,17 +7,31 @@ import { GoogleSignInButton } from '../components/GoogleSignInButton'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { useAuth } from '../context/AuthContext'
+import { consumeAuthRedirectError } from '../lib/auth'
 import { hasSupabaseConfig, supabase } from '../lib/supabase'
 import { cn } from '../lib/utils'
 
 export function LoginPage() {
-  const { session } = useAuth()
+  const { session, loading: authLoading } = useAuth()
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    const redirectError = consumeAuthRedirectError()
+    if (redirectError) setError(redirectError)
+  }, [])
+
+  if (authLoading) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center bg-ink text-muted">
+        Carregando…
+      </div>
+    )
+  }
 
   if (session) return <Navigate to="/" replace />
 

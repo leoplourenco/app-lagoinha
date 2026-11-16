@@ -65,24 +65,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let mounted = true
 
-    supabase.auth.getSession().then(async ({ data }) => {
+    async function init() {
+      // Troca ?code= do Google/PKCE por sessão (evita loop login ↔ home)
+      const url = new URL(window.location.href)
+      if (url.searchParams.has('code')) {
+        const { error } = await supabase.auth.exchangeCodeForSession(window.location.href)
+        if (!error) {
+          url.search = ''
+          window.history.replaceState({}, '', url.pathname)
+        }
+      }
+
+      const { data } = await supabase.auth.getSession()
       if (!mounted) return
       setSession(data.session)
       if (data.session?.user?.id) {
         await loadProfile(data.session.user.id)
       }
-      setLoading(false)
-    })
+      if (mounted) setLoading(false)
+    }
 
-    const { data: sub } = supabase.auth.onAuthStateChange(async (_event, next) => {
+    void init()
+
+    // Não await supabase.from dentro deste callback (pode travar / loop)
+    const { data: sub } = supabase.auth.onAuthStateChange((event, next) => {
       setSession(next)
+      if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
+        setLoading(false)
+      }
       if (next?.user?.id) {
-        await loadProfile(next.user.id)
+        void loadProfile(next.user.id)
       } else {
         setProfile(null)
         setMemberships([])
       }
-      setLoading(false)
     })
 
     return () => {
@@ -93,8 +109,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<AuthContextValue>(() => {
     const isAdmin = Boolean(profile?.is_admin)
-    const isLeader =
-      isAdmin || memberships.some((m) => m.role === 'leader')
+    const isLeader = isAdmin || memberships.some((m) => m.role === 'leader')
     const sala = memberships.find((m) => m.ministry?.slug === 'sala')
     const host = memberships.find((m) => m.ministry?.slug === 'host')
 

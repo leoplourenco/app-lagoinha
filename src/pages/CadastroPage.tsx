@@ -13,7 +13,7 @@ const PRIVACY =
   'Usamos seu nome e e-mail só para organizar escalas, check-in e operação dos ministérios da igreja. Você pode pedir exclusão depois ao admin.'
 
 export function CadastroPage() {
-  const { session } = useAuth()
+  const { session, loading: authLoading } = useAuth()
   const navigate = useNavigate()
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
@@ -21,6 +21,14 @@ export function CadastroPage() {
   const [accepted, setAccepted] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+
+  if (authLoading) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center bg-ink text-muted">
+        Carregando…
+      </div>
+    )
+  }
 
   if (session) return <Navigate to="/" replace />
 
