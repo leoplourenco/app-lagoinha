@@ -482,8 +482,13 @@ create policy dishware_manage on public.host_dishware_items for all to authentic
 
 insert into public.ministries (name, slug, active)
 values
-  ('Sala de Voluntários', 'sala', true),
-  ('Host', 'host', true)
+  ('Sala de Voluntarios', 'sala', true),
+  ('Host', 'host', true),
+  ('Diaconato', 'diaconato', true),
+  ('Midia Follow', 'midia', true),
+  ('Intercessao', 'intercessao', true),
+  ('Producao', 'producao', true),
+  ('Estacionamento - Centurioes', 'estacionamento', true)
 on conflict (slug) do nothing;
 
 insert into public.church_qr_codes (code, label, active)
