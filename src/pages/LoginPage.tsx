@@ -1,16 +1,20 @@
 import { useState, type FormEvent, type ReactNode } from 'react'
+import { Eye, EyeOff, Lock, User } from 'lucide-react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
+import { BrandMark } from '../components/brand/BrandMark'
+import { GoldWaves } from '../components/brand/GoldWaves'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
-import { Label } from '../components/ui/label'
 import { useAuth } from '../context/AuthContext'
 import { hasSupabaseConfig, supabase } from '../lib/supabase'
+import { cn } from '../lib/utils'
 
 export function LoginPage() {
   const { session } = useAuth()
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -37,39 +41,57 @@ export function LoginPage() {
   }
 
   return (
-    <AuthScreen title="Entrar" subtitle="Voluntários da Lagoinha">
-      <form onSubmit={onSubmit} className="space-y-4">
-        <div>
-          <Label htmlFor="email">E-mail</Label>
+    <AuthScreen>
+      <BrandMark size="md" />
+      <div className="mt-6 text-center">
+        <h1 className="text-2xl font-semibold tracking-tight text-white">Acesse sua conta</h1>
+        <p className="mt-2 text-sm text-muted">Entre com suas credenciais para continuar.</p>
+      </div>
+
+      <form onSubmit={onSubmit} className="mt-8 space-y-4">
+        <div className="relative">
+          <User className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gold" />
           <Input
             id="email"
             type="email"
             autoComplete="email"
+            placeholder="Usuário / e-mail"
+            className="pl-11"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
           />
         </div>
-        <div>
-          <Label htmlFor="password">Senha</Label>
+        <div className="relative">
+          <Lock className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gold" />
           <Input
             id="password"
-            type="password"
+            type={showPassword ? 'text' : 'password'}
             autoComplete="current-password"
+            placeholder="Senha"
+            className="px-11"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
           />
+          <button
+            type="button"
+            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1 text-muted hover:text-gold"
+            onClick={() => setShowPassword((v) => !v)}
+            aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+          >
+            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
         </div>
-        {error ? <p className="text-sm text-rose-200">{error}</p> : null}
-        <Button type="submit" className="w-full" disabled={loading}>
+        {error ? <p className="text-sm text-rose-300">{error}</p> : null}
+        <Button type="submit" className="w-full" size="lg" disabled={loading}>
           {loading ? 'Entrando…' : 'Entrar'}
         </Button>
       </form>
-      <p className="mt-4 text-center text-sm text-sky-100/80">
-        Ainda não tem conta?{' '}
-        <Link className="font-semibold text-white underline" to="/cadastro">
-          Cadastre-se
+
+      <p className="mt-5 text-center text-sm text-gold">
+        <Link to="/cadastro" className="hover:text-gold-soft">
+          Ainda não tem conta? Cadastre-se
         </Link>
       </p>
     </AuthScreen>
@@ -77,23 +99,16 @@ export function LoginPage() {
 }
 
 export function AuthScreen({
-  title,
-  subtitle,
   children,
+  className,
 }: {
-  title: string
-  subtitle: string
   children: ReactNode
+  className?: string
 }) {
   return (
-    <div className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-sky-950 px-4 py-10 text-white">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(56,189,248,0.35),transparent_40%),radial-gradient(circle_at_80%_0%,rgba(14,165,233,0.25),transparent_35%),linear-gradient(180deg,#082f49,#0c4a6e)]" />
-      <div className="relative w-full max-w-md rounded-3xl border border-white/15 bg-white/10 p-6 shadow-2xl backdrop-blur">
-        <p className="text-xs uppercase tracking-[0.2em] text-sky-100/70">App Lagoinha</p>
-        <h1 className="mt-2 font-display text-3xl">{title}</h1>
-        <p className="mt-1 text-sm text-sky-100/80">{subtitle}</p>
-        <div className="mt-6">{children}</div>
-      </div>
+    <div className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-ink px-5 py-10 text-white">
+      <GoldWaves />
+      <div className={cn('relative w-full max-w-md', className)}>{children}</div>
     </div>
   )
 }

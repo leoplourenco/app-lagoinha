@@ -98,8 +98,8 @@ export function AdminPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="font-display text-2xl">Admin</h2>
-        <p className="mt-1 text-sm text-sky-100/80">
+        <h2 className="font-brand text-2xl">Admin</h2>
+        <p className="mt-1 text-sm text-muted">
           Promover admins, cultos e QR imprimível para os pontos da igreja.
         </p>
       </div>
@@ -111,7 +111,7 @@ export function AdminPage() {
             <div ref={printRef} className="rounded-xl bg-white p-4">
               <QRCodeCanvas value={qr.code} size={180} includeMargin />
             </div>
-            <p className="text-xs text-sky-100/70">{qr.code}</p>
+            <p className="text-xs text-muted">{qr.code}</p>
             <Button onClick={printQr}>Imprimir QR</Button>
           </div>
         ) : (
@@ -142,7 +142,7 @@ export function AdminPage() {
         {ministries.map((m) => (
           <div key={m.id} className="rounded-xl border border-white/10 bg-white/5 px-3 py-3">
             <p className="font-medium">{m.name}</p>
-            <p className="text-xs text-sky-100/70">
+            <p className="text-xs text-muted">
               slug: {m.slug} · {m.active ? 'ativo' : 'inativo'}
             </p>
           </div>
@@ -151,7 +151,7 @@ export function AdminPage() {
 
       <section className="space-y-3">
         <h3 className="font-semibold">Usuários / promover admin</h3>
-        <p className="text-sm text-sky-100/70">
+        <p className="text-sm text-muted">
           Pastores se cadastram como usuário normal; você promove depois.
         </p>
         {users.map((user) => (
@@ -161,7 +161,7 @@ export function AdminPage() {
           >
             <div>
               <p className="font-medium">{user.full_name}</p>
-              <p className="text-xs text-sky-100/70">
+              <p className="text-xs text-muted">
                 {user.email}
                 {user.is_admin ? ' · admin' : ''}
               </p>

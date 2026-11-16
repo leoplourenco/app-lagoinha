@@ -73,8 +73,8 @@ export function HostCardapioPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="font-display text-2xl">Cardápio do visitante</h2>
-        <p className="mt-1 text-sm text-sky-100/80">Itens base + cardápio por visita.</p>
+        <h2 className="font-brand text-2xl">Cardápio do visitante</h2>
+        <p className="mt-1 text-sm text-muted">Itens base + cardápio por visita.</p>
       </div>
 
       {isHostLeader ? (
@@ -98,7 +98,7 @@ export function HostCardapioPage() {
             <div key={item.id} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
               {item.name}
               {item.description ? (
-                <span className="text-sm text-sky-100/70"> — {item.description}</span>
+                <span className="text-sm text-muted"> — {item.description}</span>
               ) : null}
             </div>
           ))
@@ -108,7 +108,7 @@ export function HostCardapioPage() {
       <section className="space-y-3 rounded-2xl border border-white/15 bg-white/10 p-4">
         <h3 className="font-semibold">Por visita</h3>
         <select
-          className="h-11 w-full rounded-xl border border-white/15 bg-sky-950/60 px-3 text-sm"
+          className="h-11 w-full rounded-xl border border-white/15 bg-panel-2 px-3 text-sm"
           value={guestId}
           onChange={(e) => setGuestId(e.target.value)}
         >
@@ -121,7 +121,7 @@ export function HostCardapioPage() {
         {isHostLeader ? (
           <div className="flex gap-2">
             <select
-              className="h-11 w-full rounded-xl border border-white/15 bg-sky-950/60 px-3 text-sm"
+              className="h-11 w-full rounded-xl border border-white/15 bg-panel-2 px-3 text-sm"
               value={menuItemId}
               onChange={(e) => setMenuItemId(e.target.value)}
             >

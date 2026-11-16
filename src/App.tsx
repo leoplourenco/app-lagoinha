@@ -28,14 +28,14 @@ export default function App() {
     <AuthProvider>
       <BrowserRouter>
         {!hasSupabaseConfig ? (
-          <div className="flex min-h-dvh items-center justify-center bg-sky-950 px-6 text-center text-sky-50">
+          <div className="flex min-h-dvh items-center justify-center bg-ink px-6 text-center text-white">
             <div className="max-w-md space-y-3">
-              <h1 className="font-display text-3xl">App Lagoinha</h1>
-              <p>
-                Configure <code className="text-sky-200">VITE_SUPABASE_URL</code> e{' '}
-                <code className="text-sky-200">VITE_SUPABASE_ANON_KEY</code> no arquivo{' '}
-                <code className="text-sky-200">.env</code> (veja .env.example) e rode o SQL em{' '}
-                <code className="text-sky-200">supabase/schema.sql</code>.
+              <h1 className="font-brand text-3xl text-gold">App Lagoinha</h1>
+              <p className="text-muted">
+                Configure <code className="text-gold-soft">VITE_SUPABASE_URL</code> e{' '}
+                <code className="text-gold-soft">VITE_SUPABASE_ANON_KEY</code> no arquivo{' '}
+                <code className="text-gold-soft">.env</code> (veja .env.example) e rode o SQL em{' '}
+                <code className="text-gold-soft">supabase/schema.sql</code>.
               </p>
             </div>
           </div>

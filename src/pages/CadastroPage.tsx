@@ -1,8 +1,9 @@
 import { useState, type FormEvent } from 'react'
+import { Lock, User } from 'lucide-react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
+import { BrandMark } from '../components/brand/BrandMark'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
-import { Label } from '../components/ui/label'
 import { useAuth } from '../context/AuthContext'
 import { hasSupabaseConfig, supabase } from '../lib/supabase'
 import { AuthScreen } from './LoginPage'
@@ -53,42 +54,50 @@ export function CadastroPage() {
   }
 
   return (
-    <AuthScreen title="Cadastro" subtitle="Crie sua conta de voluntário">
-      <form onSubmit={onSubmit} className="space-y-4">
-        <div>
-          <Label htmlFor="name">Nome completo</Label>
+    <AuthScreen>
+      <BrandMark size="md" />
+      <div className="mt-6 text-center">
+        <h1 className="text-2xl font-semibold tracking-tight text-white">Criar conta</h1>
+        <p className="mt-2 text-sm text-muted">Cadastro de voluntário da Lagoinha.</p>
+      </div>
+
+      <form onSubmit={onSubmit} className="mt-8 space-y-4">
+        <div className="relative">
+          <User className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gold" />
           <Input
             id="name"
+            placeholder="Nome completo"
+            className="pl-11"
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
             required
           />
         </div>
-        <div>
-          <Label htmlFor="email">E-mail</Label>
-          <Input
-            id="email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
-        </div>
-        <div>
-          <Label htmlFor="password">Senha</Label>
+        <Input
+          id="email"
+          type="email"
+          placeholder="E-mail"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+        />
+        <div className="relative">
+          <Lock className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gold" />
           <Input
             id="password"
             type="password"
             minLength={6}
+            placeholder="Senha"
+            className="pl-11"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
           />
         </div>
-        <label className="flex items-start gap-3 rounded-xl border border-white/15 bg-white/5 p-3 text-sm text-sky-50/90">
+        <label className="flex items-start gap-3 rounded-2xl border border-white/10 bg-panel-2 p-3 text-sm text-muted">
           <input
             type="checkbox"
-            className="mt-1"
+            className="mt-1 accent-gold"
             checked={accepted}
             onChange={(e) => setAccepted(e.target.checked)}
           />
@@ -97,15 +106,15 @@ export function CadastroPage() {
             {PRIVACY}
           </span>
         </label>
-        {error ? <p className="text-sm text-rose-200">{error}</p> : null}
-        <Button type="submit" className="w-full" disabled={loading}>
+        {error ? <p className="text-sm text-rose-300">{error}</p> : null}
+        <Button type="submit" className="w-full" size="lg" disabled={loading}>
           {loading ? 'Criando…' : 'Criar conta'}
         </Button>
       </form>
-      <p className="mt-4 text-center text-sm text-sky-100/80">
-        Já tem conta?{' '}
-        <Link className="font-semibold text-white underline" to="/login">
-          Entrar
+
+      <p className="mt-5 text-center text-sm text-gold">
+        <Link to="/login" className="hover:text-gold-soft">
+          Já tem conta? Entrar
         </Link>
       </p>
     </AuthScreen>

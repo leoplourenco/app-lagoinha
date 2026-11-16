@@ -90,14 +90,14 @@ export function EquipePage() {
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="font-display text-2xl">Equipe</h2>
-        <p className="mt-1 text-sm text-sky-100/80">
+        <h2 className="font-brand text-2xl">Equipe</h2>
+        <p className="mt-1 text-sm text-muted">
           Só dá para adicionar quem já se cadastrou no app.
         </p>
       </div>
 
       <select
-        className="h-11 w-full rounded-xl border border-white/15 bg-sky-950/60 px-3 text-sm"
+        className="h-11 w-full rounded-xl border border-white/15 bg-panel-2 px-3 text-sm"
         value={ministryId}
         onChange={(e) => setMinistryId(e.target.value)}
       >
@@ -128,7 +128,7 @@ export function EquipePage() {
             >
               <div>
                 <p className="font-medium">{c.full_name}</p>
-                <p className="text-xs text-sky-100/70">{c.email}</p>
+                <p className="text-xs text-muted">{c.email}</p>
               </div>
               <Button size="sm" onClick={() => void addMember(c)}>
                 Adicionar
@@ -152,7 +152,7 @@ export function EquipePage() {
             >
               <div>
                 <p className="font-medium">{m.profile?.full_name}</p>
-                <p className="text-xs text-sky-100/70">
+                <p className="text-xs text-muted">
                   {m.role === 'leader' ? 'Líder' : 'Voluntário'} · {m.profile?.email}
                 </p>
               </div>

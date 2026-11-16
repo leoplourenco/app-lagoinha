@@ -67,8 +67,8 @@ export function CheckinManualPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="font-display text-2xl">Check-in manual</h2>
-        <p className="mt-1 text-sm text-sky-100/80">
+        <h2 className="font-brand text-2xl">Check-in manual</h2>
+        <p className="mt-1 text-sm text-muted">
           Busque pelo nome e marque no culto selecionado.
         </p>
       </div>
@@ -104,7 +104,7 @@ export function CheckinManualPage() {
             >
               <div>
                 <p className="font-medium">{person.full_name}</p>
-                <p className="text-xs text-sky-100/70">{person.email}</p>
+                <p className="text-xs text-muted">{person.email}</p>
               </div>
               <Button size="sm" onClick={() => void mark(person)}>
                 Marcar

@@ -118,8 +118,8 @@ export function EscalaPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="font-display text-2xl">Escala</h2>
-        <p className="mt-1 text-sm text-sky-100/80">
+        <h2 className="font-brand text-2xl">Escala</h2>
+        <p className="mt-1 text-sm text-muted">
           Cada culto tem sua escala, com rótulo (porta, café, recepção…).
         </p>
       </div>
@@ -130,7 +130,7 @@ export function EscalaPage() {
         <form onSubmit={addSlot} className="space-y-3 rounded-2xl border border-white/15 bg-white/10 p-4">
           <p className="font-semibold">Montar escala</p>
           <select
-            className="h-11 w-full rounded-xl border border-white/15 bg-sky-950/60 px-3 text-sm"
+            className="h-11 w-full rounded-xl border border-white/15 bg-panel-2 px-3 text-sm"
             value={ministryId}
             onChange={(e) => setMinistryId(e.target.value)}
           >
@@ -141,7 +141,7 @@ export function EscalaPage() {
             ))}
           </select>
           <select
-            className="h-11 w-full rounded-xl border border-white/15 bg-sky-950/60 px-3 text-sm"
+            className="h-11 w-full rounded-xl border border-white/15 bg-panel-2 px-3 text-sm"
             value={userId}
             onChange={(e) => setUserId(e.target.value)}
           >
@@ -193,10 +193,10 @@ export function EscalaPage() {
                   {slot.profile?.full_name ?? 'Voluntário'}
                   {slot.user_id === user?.id ? ' (você)' : ''}
                 </p>
-                <p className="text-sm text-sky-100/80">
+                <p className="text-sm text-muted">
                   {slot.ministry?.name} · {slot.role_label || 'sem rótulo'}
                 </p>
-                <p className="text-xs text-sky-100/60">
+                <p className="text-xs text-muted">
                   {eventId ? formatSp(events.find((e) => e.id === eventId)?.starts_at ?? '') : ''}
                 </p>
               </div>

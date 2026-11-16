@@ -10,8 +10,8 @@ export function HostHubPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="font-display text-2xl">Host</h2>
-        <p className="mt-1 text-sm text-sky-100/80">
+        <h2 className="font-brand text-2xl">Host</h2>
+        <p className="mt-1 text-sm text-muted">
           Convidados especiais, cardápio e louça.
         </p>
       </div>
@@ -23,7 +23,7 @@ export function HostHubPage() {
             className="block rounded-2xl border border-white/15 bg-white/10 px-4 py-4 hover:bg-white/15"
           >
             <p className="font-semibold">{link.label}</p>
-            <p className="text-sm text-sky-100/70">{link.hint}</p>
+            <p className="text-sm text-muted">{link.hint}</p>
           </Link>
         ))}
       </div>

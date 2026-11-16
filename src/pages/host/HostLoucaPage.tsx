@@ -60,8 +60,8 @@ export function HostLoucaPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="font-display text-2xl">Inventário de louça</h2>
-        <p className="mt-1 text-sm text-sky-100/80">Separado do estoque da cozinha da Sala.</p>
+        <h2 className="font-brand text-2xl">Inventário de louça</h2>
+        <p className="mt-1 text-sm text-muted">Separado do estoque da cozinha da Sala.</p>
       </div>
 
       <form onSubmit={addItem} className="space-y-2 rounded-2xl border border-white/15 bg-white/10 p-4">
@@ -98,7 +98,7 @@ export function HostLoucaPage() {
               >
                 <div>
                   <p className="font-medium">{item.name}</p>
-                  <p className="text-sm text-sky-100/70">
+                  <p className="text-sm text-muted">
                     {item.quantity} {item.unit} · mín. {item.minimum}
                   </p>
                   {low ? <Badge className="mt-1 bg-rose-500/40">Alerta</Badge> : null}

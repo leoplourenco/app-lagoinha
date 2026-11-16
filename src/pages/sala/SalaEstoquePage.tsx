@@ -63,8 +63,8 @@ export function SalaEstoquePage() {
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="font-display text-2xl">Estoque da cozinha</h2>
-        <p className="mt-1 text-sm text-sky-100/80">Itens com alerta quando abaixo do mínimo.</p>
+        <h2 className="font-brand text-2xl">Estoque da cozinha</h2>
+        <p className="mt-1 text-sm text-muted">Itens com alerta quando abaixo do mínimo.</p>
       </div>
 
       <form onSubmit={addItem} className="space-y-2 rounded-2xl border border-white/15 bg-white/10 p-4">
@@ -104,7 +104,7 @@ export function SalaEstoquePage() {
               >
                 <div>
                   <p className="font-medium">{item.name}</p>
-                  <p className="text-sm text-sky-100/70">
+                  <p className="text-sm text-muted">
                     {item.quantity} {item.unit} · mín. {item.minimum}
                   </p>
                   {low ? <Badge className="mt-1 bg-rose-500/40">Abaixo do mínimo</Badge> : null}

@@ -8,14 +8,14 @@ export function ConfigPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="font-display text-2xl">Config</h2>
-        <p className="mt-1 text-sm text-sky-100/80">Conta e orientações.</p>
+        <h2 className="font-brand text-2xl">Config</h2>
+        <p className="mt-1 text-sm text-muted">Conta e orientações.</p>
       </div>
 
       <section className="rounded-2xl border border-white/15 bg-white/10 p-4">
         <p className="font-semibold">{profile?.full_name}</p>
-        <p className="text-sm text-sky-100/70">{profile?.email}</p>
-        <p className="mt-2 text-xs text-sky-100/60">
+        <p className="text-sm text-muted">{profile?.email}</p>
+        <p className="mt-2 text-xs text-muted">
           {isAdmin ? 'Admin' : 'Voluntário'}
           {memberships.length
             ? ` · ${memberships.map((m) => m.ministry?.name).filter(Boolean).join(', ')}`
@@ -25,7 +25,7 @@ export function ConfigPage() {
 
       <section className="rounded-2xl border border-white/15 bg-white/10 p-4">
         <p className="font-semibold">Como instalar o app</p>
-        <p className="mt-1 text-sm text-sky-100/70">
+        <p className="mt-1 text-sm text-muted">
           Opcional — não é obrigatório no primeiro login. Use o atalho na tela inicial se quiser.
         </p>
         <Link to="/instalar" className="mt-3 inline-block text-sm font-semibold underline">

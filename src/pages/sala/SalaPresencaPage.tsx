@@ -120,8 +120,8 @@ export function SalaPresencaPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="font-display text-2xl">Presença na porta</h2>
-        <p className="mt-1 text-sm text-sky-100/80">
+        <h2 className="font-brand text-2xl">Presença na porta</h2>
+        <p className="mt-1 text-sm text-muted">
           Lista da escala do culto. Voluntário offline? Ele fala o nome — você busca e dá baixa.
         </p>
       </div>
@@ -153,7 +153,7 @@ export function SalaPresencaPage() {
             >
               <div>
                 <p className="font-medium">{row.profile?.full_name}</p>
-                <p className="text-sm text-sky-100/70">{row.role_label || 'sem rótulo'}</p>
+                <p className="text-sm text-muted">{row.role_label || 'sem rótulo'}</p>
                 {row.status === 'liberated' && row.arrived_at ? (
                   <p className="text-xs text-emerald-200">
                     Liberado {formatSp(row.arrived_at, 'HH:mm')}

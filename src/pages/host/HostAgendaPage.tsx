@@ -66,8 +66,8 @@ export function HostAgendaPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="font-display text-2xl">Agenda de convidados</h2>
-        <p className="mt-1 text-sm text-sky-100/80">
+        <h2 className="font-brand text-2xl">Agenda de convidados</h2>
+        <p className="mt-1 text-sm text-muted">
           Membro marca “chegou”; líder/admin faz o CRUD da visita.
         </p>
       </div>
@@ -81,7 +81,7 @@ export function HostAgendaPage() {
             required
           />
           <select
-            className="h-11 w-full rounded-xl border border-white/15 bg-sky-950/60 px-3 text-sm"
+            className="h-11 w-full rounded-xl border border-white/15 bg-panel-2 px-3 text-sm"
             value={guestType}
             onChange={(e) => setGuestType(e.target.value as GuestType)}
           >
@@ -116,9 +116,9 @@ export function HostAgendaPage() {
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="font-semibold">{guest.name}</p>
-                  <p className="text-sm text-sky-100/70">{guest.guest_type}</p>
+                  <p className="text-sm text-muted">{guest.guest_type}</p>
                   {guest.contact ? (
-                    <p className="text-xs text-sky-100/60">{guest.contact}</p>
+                    <p className="text-xs text-muted">{guest.contact}</p>
                   ) : null}
                 </div>
                 <Badge>{guest.status}</Badge>

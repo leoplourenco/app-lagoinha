@@ -111,8 +111,8 @@ export function CheckinPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="font-display text-2xl">Check-in por culto</h2>
-        <p className="mt-1 text-sm text-sky-100/80">
+        <h2 className="font-brand text-2xl">Check-in por culto</h2>
+        <p className="mt-1 text-sm text-muted">
           Manhã e noite são cultos separados. Quem serve nos dois faz dois check-ins.
         </p>
       </div>
