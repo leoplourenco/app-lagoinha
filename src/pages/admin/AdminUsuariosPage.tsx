@@ -55,23 +55,24 @@ export function AdminUsuariosPage() {
     return members.filter((m) => m.user_id === userId)
   }
 
-  async function setLeader(user: Profile, ministryId: string, asLeader: boolean) {
+  async function makeLeader(user: Profile, ministryId: string) {
     setMessage(null)
     setError(null)
     const existing = members.find(
       (m) => m.user_id === user.user_id && m.ministry_id === ministryId,
     )
+    const ministryName = ministries.find((m) => m.id === ministryId)?.name ?? 'ministério'
 
     if (existing) {
       const { error: err } = await supabase
         .from('ministry_members')
-        .update({ role: asLeader ? 'leader' : 'volunteer' })
+        .update({ role: 'leader' })
         .eq('id', existing.id)
       if (err) {
         setError(err.message)
         return
       }
-    } else if (asLeader) {
+    } else {
       const { error: err } = await supabase.from('ministry_members').insert({
         user_id: user.user_id,
         ministry_id: ministryId,
@@ -83,12 +84,63 @@ export function AdminUsuariosPage() {
       }
     }
 
-    const ministryName = ministries.find((m) => m.id === ministryId)?.name ?? 'ministério'
-    setMessage(
-      asLeader
-        ? `${user.full_name} agora é líder de ${ministryName}.`
-        : `${user.full_name} deixou de ser líder de ${ministryName}.`,
+    setMessage(`${user.full_name} agora é líder de ${ministryName}.`)
+    await load()
+  }
+
+  async function makeVolunteer(user: Profile, ministryId: string) {
+    setMessage(null)
+    setError(null)
+    const existing = members.find(
+      (m) => m.user_id === user.user_id && m.ministry_id === ministryId,
     )
+    const ministryName = ministries.find((m) => m.id === ministryId)?.name ?? 'ministério'
+
+    if (existing) {
+      const { error: err } = await supabase
+        .from('ministry_members')
+        .update({ role: 'volunteer' })
+        .eq('id', existing.id)
+      if (err) {
+        setError(err.message)
+        return
+      }
+    } else {
+      const { error: err } = await supabase.from('ministry_members').insert({
+        user_id: user.user_id,
+        ministry_id: ministryId,
+        role: 'volunteer',
+      })
+      if (err) {
+        setError(err.message)
+        return
+      }
+    }
+
+    setMessage(`${user.full_name} é voluntário de ${ministryName}.`)
+    await load()
+  }
+
+  /** Sai do ministério por completo — sem isso, "remover líder" deixava voluntário e o hub continuava aberto. */
+  async function removeFromMinistry(user: Profile, ministryId: string) {
+    setMessage(null)
+    setError(null)
+    const existing = members.find(
+      (m) => m.user_id === user.user_id && m.ministry_id === ministryId,
+    )
+    if (!existing) return
+
+    const { error: err } = await supabase
+      .from('ministry_members')
+      .delete()
+      .eq('id', existing.id)
+    if (err) {
+      setError(err.message)
+      return
+    }
+
+    const ministryName = ministries.find((m) => m.id === ministryId)?.name ?? 'ministério'
+    setMessage(`${user.full_name} foi removido de ${ministryName}.`)
     await load()
   }
 
@@ -119,7 +171,8 @@ export function AdminUsuariosPage() {
         </Link>
         <h2 className="mt-2 font-brand text-2xl text-gold">Usuários</h2>
         <p className="mt-1 text-sm text-muted">
-          Promova alguém a líder de um ministério ou remova a liderança. Admin do app é separado.
+          Cada ministério é separado. Remover = sai do ministério (não fica voluntário
+          escondido).
         </p>
       </div>
 
@@ -144,41 +197,89 @@ export function AdminUsuariosPage() {
                   </div>
                   <div className="flex flex-wrap gap-1">
                     {user.is_admin ? <Badge>Admin</Badge> : null}
-                    {userMemberships
-                      .filter((m) => m.role === 'leader')
-                      .map((m) => (
-                        <Badge key={m.id}>Líder · {m.ministry?.name}</Badge>
-                      ))}
+                    {userMemberships.map((m) => (
+                      <Badge key={m.id}>
+                        {m.role === 'leader' ? 'Líder' : 'Voluntário'} · {m.ministry?.name}
+                      </Badge>
+                    ))}
                   </div>
                 </div>
 
                 <div className="mt-4 space-y-2">
-                  <p className="text-xs uppercase tracking-wide text-gold">Liderança por ministério</p>
+                  <p className="text-xs uppercase tracking-wide text-gold">Por ministério</p>
                   {ministries.map((ministry) => {
                     const mem = userMemberships.find((m) => m.ministry_id === ministry.id)
                     const isLeader = mem?.role === 'leader'
+                    const isVolunteer = mem?.role === 'volunteer'
                     return (
                       <div
                         key={ministry.id}
-                        className="flex items-center justify-between gap-2 rounded-xl bg-black/30 px-3 py-2"
+                        className="flex flex-col gap-2 rounded-xl bg-black/30 px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
                       >
                         <div>
                           <p className="text-sm font-medium">{ministry.name}</p>
                           <p className="text-xs text-muted">
                             {isLeader
                               ? 'É líder'
-                              : mem
+                              : isVolunteer
                                 ? 'É voluntário'
                                 : 'Fora da equipe'}
                           </p>
                         </div>
-                        <Button
-                          size="sm"
-                          variant={isLeader ? 'outline' : 'default'}
-                          onClick={() => void setLeader(user, ministry.id, !isLeader)}
-                        >
-                          {isLeader ? 'Remover líder' : 'Tornar líder'}
-                        </Button>
+                        <div className="flex flex-wrap gap-1">
+                          {!mem ? (
+                            <>
+                              <Button
+                                size="sm"
+                                onClick={() => void makeLeader(user, ministry.id)}
+                              >
+                                Tornar líder
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => void makeVolunteer(user, ministry.id)}
+                              >
+                                Voluntário
+                              </Button>
+                            </>
+                          ) : null}
+                          {isVolunteer ? (
+                            <>
+                              <Button
+                                size="sm"
+                                onClick={() => void makeLeader(user, ministry.id)}
+                              >
+                                Tornar líder
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => void removeFromMinistry(user, ministry.id)}
+                              >
+                                Remover
+                              </Button>
+                            </>
+                          ) : null}
+                          {isLeader ? (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => void makeVolunteer(user, ministry.id)}
+                              >
+                                Só voluntário
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => void removeFromMinistry(user, ministry.id)}
+                              >
+                                Remover
+                              </Button>
+                            </>
+                          ) : null}
+                        </div>
                       </div>
                     )
                   })}
@@ -186,7 +287,8 @@ export function AdminUsuariosPage() {
 
                 <div className="mt-4 border-t border-white/10 pt-3">
                   <p className="mb-2 text-xs text-muted">
-                    Admin do app ≠ líder de ministério. Use isso só para pastores/admins globais.
+                    Admin do app ≠ líder de ministério. Use isso só para pastores/admins
+                    globais.
                   </p>
                   <Button
                     size="sm"
