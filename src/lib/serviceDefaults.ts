@@ -5,8 +5,8 @@ import { APP_TZ, dayKeySp, formatEventTime, formatSp } from './timezone'
 export const STANDARD_SERVICES = [
   { id: 'quarta', weekday: 3, hour: 20, minute: 15, title: 'Culto Fé' },
   { id: 'sabado', weekday: 6, hour: 19, minute: 30, title: 'Legacy' },
-  { id: 'domingo-manha', weekday: 0, hour: 9, minute: 0, title: 'Domingo manhã' },
-  { id: 'domingo-noite', weekday: 0, hour: 18, minute: 0, title: 'Domingo noite' },
+  { id: 'domingo-manha', weekday: 0, hour: 9, minute: 0, title: 'Culto Dmg manhã' },
+  { id: 'domingo-noite', weekday: 0, hour: 18, minute: 0, title: 'Culto Dmg noite' },
 ] as const
 
 export type ProposedService = {

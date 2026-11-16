@@ -247,7 +247,7 @@ export function EscalaPage() {
           {mode === 'padrao' ? (
             <div className="space-y-2">
               <p className="text-xs text-muted">
-                Culto Fé (qua 20:15) · Legacy (sáb 19:30) · Domingo 09:00 e 18:00
+                Culto Fé · Legacy · Culto Dmg manhã · Culto Dmg noite
               </p>
               <div className="grid gap-2">
                 {standardOptions.map((opt) => {
