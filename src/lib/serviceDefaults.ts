@@ -16,6 +16,8 @@ export type ProposedService = {
   dayLabel: string
   timeLabel: string
   isStandard: boolean
+  /** id da grade (quarta, sabado, …) quando for culto padrão */
+  standardId?: string
 }
 
 function pad(n: number) {
@@ -57,9 +59,10 @@ function jsWeekdaySp(year: number, month: number, day: number) {
 }
 
 /**
- * Próximas ocorrências da grade padrão (ex.: 2 semanas), ordenadas.
+ * Próximas ocorrências da grade padrão, ordenadas.
+ * weeks=6 cobre ~mês+ para o líder marcar vários cultos de uma vez.
  */
-export function upcomingStandardServices(weeks = 2): ProposedService[] {
+export function upcomingStandardServices(weeks = 6): ProposedService[] {
   const now = Date.now()
   const [y0, m0, d0] = dayKeySp(new Date()).split('-').map(Number)
   const out: ProposedService[] = []
@@ -80,6 +83,7 @@ export function upcomingStandardServices(weeks = 2): ProposedService[] {
         dayLabel: formatSp(startsAtIso, 'EEEE, dd/MM'),
         timeLabel: formatEventTime(startsAtIso),
         isStandard: true,
+        standardId: def.id,
       })
     }
   }

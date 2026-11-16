@@ -6,20 +6,22 @@ import { ServicePicker } from '../components/ServicePicker'
 import { useAuth } from '../context/AuthContext'
 import { useServiceEvents } from '../hooks/useServiceEvents'
 import {
+  STANDARD_SERVICES,
   buildSpecialService,
   upcomingStandardServices,
   type ProposedService,
 } from '../lib/serviceDefaults'
 import { findOrCreateServiceEvent } from '../lib/serviceEvents'
 import { canManageMinistry, leaderMemberships, leaderMinistryIds } from '../lib/roles'
-import { formatEventWhen, formatSp } from '../lib/timezone'
+import { formatSp } from '../lib/timezone'
 import { supabase } from '../lib/supabase'
 import { cn } from '../lib/utils'
-import type { Ministry, Profile, ScheduleSlot, ServiceEvent } from '../types/database'
+import type { Ministry, Profile, ScheduleSlot } from '../types/database'
 
 type SlotRow = ScheduleSlot & {
   profile?: Profile
   ministry?: Ministry
+  event?: { starts_at: string; title: string }
 }
 
 const SUGGESTED_LABELS = ['porta', 'café', 'recepção']
@@ -29,11 +31,12 @@ export function EscalaPage() {
   const canManage = isLeader || isAdmin
   const managedIds = useMemo(() => leaderMinistryIds(memberships), [memberships])
   const { schedulableEvents, activeEvent, refresh } = useServiceEvents()
-  const standardOptions = useMemo(() => upcomingStandardServices(2), [])
+  const standardOptions = useMemo(() => upcomingStandardServices(6), [])
 
   const [mode, setMode] = useState<'padrao' | 'especial'>('padrao')
+  const [selectedKeys, setSelectedKeys] = useState<string[]>([])
+  const [specialExtras, setSpecialExtras] = useState<ProposedService[]>([])
   const [eventId, setEventId] = useState<string | null>(null)
-  const [selectedMeta, setSelectedMeta] = useState<ProposedService | null>(null)
   const [selecting, setSelecting] = useState(false)
   const [specialWhen, setSpecialWhen] = useState('')
   const [specialTitle, setSpecialTitle] = useState('')
@@ -46,6 +49,20 @@ export function EscalaPage() {
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
 
+  const allOptions = useMemo(() => {
+    const map = new Map<string, ProposedService>()
+    for (const opt of standardOptions) map.set(opt.key, opt)
+    for (const opt of specialExtras) map.set(opt.key, opt)
+    return [...map.values()].sort(
+      (a, b) => new Date(a.startsAtIso).getTime() - new Date(b.startsAtIso).getTime(),
+    )
+  }, [standardOptions, specialExtras])
+
+  const selectedOptions = useMemo(
+    () => allOptions.filter((o) => selectedKeys.includes(o.key)),
+    [allOptions, selectedKeys],
+  )
+
   const leaderMinistries = useMemo(() => {
     if (isAdmin) {
       return allMinistries.map((m) => ({
@@ -57,11 +74,6 @@ export function EscalaPage() {
     return leaderMemberships(memberships)
   }, [isAdmin, allMinistries, memberships])
 
-  const selectedEvent: ServiceEvent | null = useMemo(() => {
-    if (!eventId) return null
-    return schedulableEvents.find((e) => e.id === eventId) ?? null
-  }, [eventId, schedulableEvents])
-
   useEffect(() => {
     if (!isAdmin) return
     void supabase
@@ -72,7 +84,6 @@ export function EscalaPage() {
       .then(({ data }) => setAllMinistries((data as Ministry[]) ?? []))
   }, [isAdmin])
 
-  // Voluntário: pré-seleciona culto ativo. Líder escolhe na mão.
   useEffect(() => {
     if (canManage) return
     if (!eventId && activeEvent) setEventId(activeEvent.id)
@@ -89,15 +100,15 @@ export function EscalaPage() {
     }
   }, [leaderMinistries, ministryId])
 
-  async function loadSlots() {
-    if (!eventId || !user) {
+  async function loadSlotsForEvents(ids: string[]) {
+    if (!user || ids.length === 0) {
       setSlots([])
       return
     }
     let query = supabase
       .from('schedule_slots')
-      .select('*, profile:profiles(*), ministry:ministries(*)')
-      .eq('event_id', eventId)
+      .select('*, profile:profiles(*), ministry:ministries(*), event:service_events(starts_at, title)')
+      .in('event_id', ids)
       .order('created_at')
 
     if (isAdmin) {
@@ -116,11 +127,18 @@ export function EscalaPage() {
       return
     }
     setSlots(
-      ((data as SlotRow[]) ?? []).map((s) => ({
-        ...s,
-        profile: Array.isArray(s.profile) ? s.profile[0] : s.profile,
-        ministry: Array.isArray(s.ministry) ? s.ministry[0] : s.ministry,
-      })),
+      ((data as SlotRow[]) ?? [])
+        .map((s) => ({
+          ...s,
+          profile: Array.isArray(s.profile) ? s.profile[0] : s.profile,
+          ministry: Array.isArray(s.ministry) ? s.ministry[0] : s.ministry,
+          event: Array.isArray(s.event) ? s.event[0] : s.event,
+        }))
+        .sort(
+          (a, b) =>
+            new Date(a.event?.starts_at ?? 0).getTime() -
+            new Date(b.event?.starts_at ?? 0).getTime(),
+        ),
     )
   }
 
@@ -137,65 +155,124 @@ export function EscalaPage() {
   }
 
   useEffect(() => {
-    void loadSlots()
+    if (canManage) {
+      // lista é recarregada após escalar; seleção sem event ids ainda
+      return
+    }
+    void loadSlotsForEvents(eventId ? [eventId] : [])
   }, [eventId, user, canManage, isAdmin, managedIds.join(',')])
 
   useEffect(() => {
     if (ministryId) void loadMembers(ministryId)
   }, [ministryId])
 
-  async function selectProposed(proposed: ProposedService) {
-    setError(null)
-    setMessage(null)
-    setSelecting(true)
-    const { event, error: err } = await findOrCreateServiceEvent(
-      proposed.startsAtIso,
-      proposed.title,
+  function toggleKey(key: string) {
+    setSelectedKeys((prev) =>
+      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key],
     )
-    setSelecting(false)
-    if (err || !event) {
-      setError(err || 'Não foi possível abrir este culto.')
-      return
-    }
-    setSelectedMeta(proposed)
-    setEventId(event.id)
-    setMessage(`Escala de ${proposed.dayLabel} · ${proposed.timeLabel}`)
-    await refresh()
+    setMessage(null)
+    setError(null)
   }
 
-  async function useSpecial(e: FormEvent) {
+  function selectByStandardId(standardId: string) {
+    const keys = standardOptions
+      .filter((o) => o.standardId === standardId)
+      .map((o) => o.key)
+    setSelectedKeys((prev) => [...new Set([...prev, ...keys])])
+    setMode('padrao')
+    setMessage(null)
+  }
+
+  function clearSelection() {
+    setSelectedKeys([])
+    setSlots([])
+    setMessage(null)
+  }
+
+  async function addSpecial(e: FormEvent) {
     e.preventDefault()
     setError(null)
     if (!specialWhen) {
       setError('Informe dia, mês e horário do evento.')
       return
     }
-    await selectProposed(buildSpecialService(specialWhen, specialTitle))
+    const proposed = buildSpecialService(specialWhen, specialTitle)
+    setSpecialExtras((prev) =>
+      prev.some((p) => p.key === proposed.key) ? prev : [...prev, proposed],
+    )
+    setSelectedKeys((prev) =>
+      prev.includes(proposed.key) ? prev : [...prev, proposed.key],
+    )
+    setSpecialWhen('')
+    setSpecialTitle('')
+    setMessage(`Evento especial marcado: ${proposed.dayLabel} · ${proposed.timeLabel}`)
+    setMode('padrao')
+  }
+
+  async function resolveEventIds(options: ProposedService[]) {
+    const ids: string[] = []
+    for (const opt of options) {
+      const { event, error: err } = await findOrCreateServiceEvent(
+        opt.startsAtIso,
+        opt.title,
+      )
+      if (err || !event) throw new Error(err || `Falha em ${opt.title}`)
+      ids.push(event.id)
+    }
+    return ids
   }
 
   async function addSlot(e: FormEvent) {
     e.preventDefault()
     setError(null)
-    if (!eventId || !ministryId || !userId) {
-      setError('Escolha o horário, o ministério e o voluntário.')
+    setMessage(null)
+
+    if (!canManage) return
+
+    if (selectedOptions.length === 0 || !ministryId || !userId) {
+      setError('Marque um ou mais cultos, depois escolha o voluntário.')
       return
     }
     if (!canManageMinistry(memberships, ministryId, isAdmin)) {
       setError('Você só pode montar escala nos ministérios que lidera.')
       return
     }
-    const { error: err } = await supabase.from('schedule_slots').insert({
-      event_id: eventId,
-      ministry_id: ministryId,
-      user_id: userId,
-      role_label: roleLabel.trim() || 'função',
-    })
-    if (err) {
-      setError(err.message)
-      return
+
+    setSelecting(true)
+    try {
+      const eventIds = await resolveEventIds(selectedOptions)
+      const rows = eventIds.map((eid) => ({
+        event_id: eid,
+        ministry_id: ministryId,
+        user_id: userId,
+        role_label: roleLabel.trim() || 'função',
+      }))
+
+      const { error: err } = await supabase.from('schedule_slots').upsert(rows, {
+        onConflict: 'event_id,ministry_id,user_id',
+        ignoreDuplicates: false,
+      })
+
+      if (err) {
+        // unique pode exigir update do rótulo; se upsert falhar, tenta insert e ignora duplicata
+        const { error: insertErr } = await supabase.from('schedule_slots').insert(rows)
+        if (insertErr && !insertErr.message.toLowerCase().includes('duplicate')) {
+          setError(insertErr.message)
+          return
+        }
+      }
+
+      const volunteer = members.find((m) => m.user_id === userId)?.full_name ?? 'Voluntário'
+      setMessage(
+        `${volunteer} escalado em ${selectedOptions.length} culto${selectedOptions.length > 1 ? 's' : ''}.`,
+      )
+      await refresh()
+      await loadSlotsForEvents(eventIds)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Erro ao escalar')
+    } finally {
+      setSelecting(false)
     }
-    setUserId('')
-    await loadSlots()
   }
 
   async function removeSlot(slot: SlotRow) {
@@ -204,15 +281,35 @@ export function EscalaPage() {
       return
     }
     await supabase.from('schedule_slots').delete().eq('id', slot.id)
-    await loadSlots()
+    if (canManage && selectedOptions.length > 0) {
+      try {
+        const ids = await resolveEventIds(selectedOptions)
+        await loadSlotsForEvents(ids)
+      } catch {
+        setSlots((prev) => prev.filter((s) => s.id !== slot.id))
+      }
+    } else if (eventId) {
+      await loadSlotsForEvents([eventId])
+    }
   }
 
-  const headerWhen =
-    selectedMeta
-      ? `${selectedMeta.dayLabel} · ${selectedMeta.timeLabel}`
-      : selectedEvent
-        ? formatEventWhen(selectedEvent.starts_at)
-        : null
+  async function previewSelected() {
+    if (selectedOptions.length === 0) {
+      setSlots([])
+      return
+    }
+    setSelecting(true)
+    setError(null)
+    try {
+      const ids = await resolveEventIds(selectedOptions)
+      await refresh()
+      await loadSlotsForEvents(ids)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Erro ao carregar escalas')
+    } finally {
+      setSelecting(false)
+    }
+  }
 
   return (
     <div className="space-y-5">
@@ -220,7 +317,7 @@ export function EscalaPage() {
         <h2 className="font-brand text-2xl">Escala</h2>
         <p className="mt-1 text-sm text-muted">
           {canManage
-            ? 'Escolha o culto padrão ou um evento especial; depois encaixe os voluntários.'
+            ? 'Marque vários cultos do mês e encaixe o mesmo voluntário de uma vez.'
             : 'Veja em qual data/horário você está escalado.'}
         </p>
       </div>
@@ -245,45 +342,70 @@ export function EscalaPage() {
           </div>
 
           {mode === 'padrao' ? (
-            <div className="space-y-2">
+            <div className="space-y-3">
               <p className="text-xs text-muted">
-                Culto Fé · Legacy · Culto Dmg manhã · Culto Dmg noite
+                Toque para marcar/desmarcar. Pode selecionar vários do mês.
               </p>
+              <div className="flex flex-wrap gap-2">
+                {STANDARD_SERVICES.map((def) => (
+                  <Button
+                    key={def.id}
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => selectByStandardId(def.id)}
+                  >
+                    Todos {def.title}
+                  </Button>
+                ))}
+                {selectedKeys.length > 0 ? (
+                  <Button type="button" size="sm" variant="ghost" onClick={clearSelection}>
+                    Limpar
+                  </Button>
+                ) : null}
+              </div>
               <div className="grid gap-2">
                 {standardOptions.map((opt) => {
-                  const active =
-                    selectedMeta?.key === opt.key ||
-                    (selectedEvent &&
-                      Math.abs(
-                        new Date(selectedEvent.starts_at).getTime() -
-                          new Date(opt.startsAtIso).getTime(),
-                      ) < 60_000)
+                  const active = selectedKeys.includes(opt.key)
                   return (
                     <button
                       key={opt.key}
                       type="button"
                       disabled={selecting}
-                      onClick={() => void selectProposed(opt)}
+                      onClick={() => toggleKey(opt.key)}
                       className={cn(
-                        'rounded-xl border px-3 py-3 text-left transition',
+                        'flex items-start gap-3 rounded-xl border px-3 py-3 text-left transition',
                         active
                           ? 'border-gold bg-gold/20'
                           : 'border-white/15 bg-white/5 hover:bg-white/10',
                       )}
                     >
-                      <p className="font-semibold text-white">
-                        {opt.dayLabel} · {opt.timeLabel}
-                      </p>
-                      <p className="text-sm text-muted">{opt.title}</p>
+                      <span
+                        className={cn(
+                          'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border text-xs',
+                          active
+                            ? 'border-gold bg-gold text-ink'
+                            : 'border-white/30 text-transparent',
+                        )}
+                      >
+                        ✓
+                      </span>
+                      <span>
+                        <p className="font-semibold text-white">
+                          {opt.dayLabel} · {opt.timeLabel}
+                        </p>
+                        <p className="text-sm text-muted">{opt.title}</p>
+                      </span>
                     </button>
                   )
                 })}
               </div>
             </div>
           ) : (
-            <form onSubmit={useSpecial} className="space-y-3">
+            <form onSubmit={addSpecial} className="space-y-3">
               <p className="text-sm text-muted">
-                Fora da grade? Informe o dia, o mês e o horário na mão.
+                Fora da grade? Informe o dia, o mês e o horário — entra na seleção junto
+                com os padrão.
               </p>
               <div>
                 <p className="mb-1 text-xs uppercase tracking-wide text-gold">
@@ -306,11 +428,41 @@ export function EscalaPage() {
                   placeholder="Vigília, conferência, ensaio…"
                 />
               </div>
-              <Button type="submit" className="w-full" disabled={selecting}>
-                {selecting ? 'Abrindo…' : 'Usar esta data e horário'}
+              <Button type="submit" className="w-full">
+                Marcar este evento na seleção
               </Button>
             </form>
           )}
+
+          {selectedOptions.length > 0 ? (
+            <div className="rounded-xl border border-gold/30 bg-gold/10 px-3 py-3">
+              <p className="text-xs uppercase tracking-wide text-gold">
+                {selectedOptions.length} culto
+                {selectedOptions.length > 1 ? 's' : ''} selecionado
+                {selectedOptions.length > 1 ? 's' : ''}
+              </p>
+              <ul className="mt-2 space-y-1 text-sm text-muted">
+                {selectedOptions.slice(0, 8).map((o) => (
+                  <li key={o.key}>
+                    {o.dayLabel} · {o.timeLabel} · {o.title}
+                  </li>
+                ))}
+                {selectedOptions.length > 8 ? (
+                  <li>+ {selectedOptions.length - 8} outros</li>
+                ) : null}
+              </ul>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="mt-3"
+                disabled={selecting}
+                onClick={() => void previewSelected()}
+              >
+                Ver quem já está nesses cultos
+              </Button>
+            </div>
+          ) : null}
         </section>
       ) : (
         <ServicePicker
@@ -321,24 +473,12 @@ export function EscalaPage() {
         />
       )}
 
-      {headerWhen ? (
-        <div className="rounded-2xl border border-gold/30 bg-gold/10 px-4 py-3">
-          <p className="text-xs uppercase tracking-wide text-gold">Montando escala de</p>
-          <p className="font-semibold text-white">{headerWhen}</p>
-          {selectedMeta && !selectedMeta.isStandard ? (
-            <p className="text-sm text-muted">{selectedMeta.title}</p>
-          ) : null}
-        </div>
-      ) : canManage ? (
-        <EmptyState
-          title="Escolha quando"
-          description="Toque em um culto padrão ou cadastre um evento especial."
-        />
-      ) : null}
-
-      {canManage && eventId ? (
+      {canManage && selectedOptions.length > 0 ? (
         <form onSubmit={addSlot} className="space-y-3 rounded-2xl border border-white/15 bg-white/10 p-4">
-          <p className="font-semibold">Adicionar voluntário</p>
+          <p className="font-semibold">
+            Adicionar voluntário em {selectedOptions.length} culto
+            {selectedOptions.length > 1 ? 's' : ''}
+          </p>
           {leaderMinistries.length > 1 ? (
             <select
               className="h-11 w-full rounded-xl border border-white/15 bg-panel-2 px-3 text-sm"
@@ -382,54 +522,61 @@ export function EscalaPage() {
             onChange={(e) => setRoleLabel(e.target.value)}
             placeholder="Função na escala"
           />
-          <Button type="submit" className="w-full">
-            Adicionar na escala
+          <Button type="submit" className="w-full" disabled={selecting}>
+            {selecting
+              ? 'Escalando…'
+              : `Escalar neste${selectedOptions.length > 1 ? 's' : ''} ${selectedOptions.length} culto${selectedOptions.length > 1 ? 's' : ''}`}
           </Button>
         </form>
       ) : null}
 
-      {eventId ? (
-        slots.length === 0 ? (
+      {!canManage && !eventId ? null : slots.length === 0 ? (
+        canManage && selectedOptions.length === 0 ? (
           <EmptyState
-            title="Nada nesta data/horário"
+            title="Marque os cultos"
+            description="Selecione um ou mais cultos padrão (ou um especial) para montar a escala."
+          />
+        ) : (
+          <EmptyState
+            title="Nada nestes cultos ainda"
             description={
               canManage
-                ? 'Adicione o primeiro voluntário acima.'
+                ? 'Escolha o voluntário acima para escalar em todos os marcados.'
                 : 'Peça ao líder para te colocar na escala.'
             }
           />
-        ) : (
-          <div className="space-y-2">
-            <p className="text-sm font-medium text-gold">Quem está nesta escala</p>
-            {slots.map((slot) => (
-              <div
-                key={slot.id}
-                className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/5 px-3 py-3"
-              >
-                <div>
-                  <p className="font-medium">
-                    {slot.profile?.full_name ?? 'Voluntário'}
-                    {slot.user_id === user?.id ? ' (você)' : ''}
-                  </p>
-                  <p className="text-sm text-muted">
-                    {slot.ministry?.name} · {slot.role_label || 'sem rótulo'}
-                  </p>
-                  {!canManage ? (
-                    <p className="text-xs text-muted">
-                      {formatSp(selectedEvent?.starts_at ?? '')}
-                    </p>
-                  ) : null}
-                </div>
-                {canManageMinistry(memberships, slot.ministry_id, isAdmin) ? (
-                  <Button size="sm" variant="ghost" onClick={() => void removeSlot(slot)}>
-                    Remover
-                  </Button>
-                ) : null}
-              </div>
-            ))}
-          </div>
         )
-      ) : null}
+      ) : (
+        <div className="space-y-2">
+          <p className="text-sm font-medium text-gold">Quem está na escala</p>
+          {slots.map((slot) => (
+            <div
+              key={slot.id}
+              className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/5 px-3 py-3"
+            >
+              <div>
+                <p className="font-medium">
+                  {slot.profile?.full_name ?? 'Voluntário'}
+                  {slot.user_id === user?.id ? ' (você)' : ''}
+                </p>
+                <p className="text-sm text-muted">
+                  {slot.ministry?.name} · {slot.role_label || 'sem rótulo'}
+                </p>
+                <p className="text-xs text-muted">
+                  {slot.event?.starts_at
+                    ? `${formatSp(slot.event.starts_at, 'EEEE, dd/MM · HH:mm')} · ${slot.event.title}`
+                    : null}
+                </p>
+              </div>
+              {canManageMinistry(memberships, slot.ministry_id, isAdmin) ? (
+                <Button size="sm" variant="ghost" onClick={() => void removeSlot(slot)}>
+                  Remover
+                </Button>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      )}
 
       {message ? <p className="text-sm text-emerald-200">{message}</p> : null}
       {error ? <p className="text-sm text-rose-200">{error}</p> : null}
