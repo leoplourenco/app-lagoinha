@@ -12,6 +12,9 @@ import { CheckinManualPage } from './pages/CheckinManualPage'
 import { EscalaPage } from './pages/EscalaPage'
 import { EquipePage } from './pages/EquipePage'
 import { AdminPage } from './pages/AdminPage'
+import { AdminMinisteriosPage } from './pages/admin/AdminMinisteriosPage'
+import { AdminUsuariosPage } from './pages/admin/AdminUsuariosPage'
+import { AdminFerramentasPage } from './pages/admin/AdminFerramentasPage'
 import { ConfigPage } from './pages/ConfigPage'
 import { InstalarPage } from './pages/InstalarPage'
 import { RelatoriosPage } from './pages/RelatoriosPage'
@@ -78,6 +81,10 @@ export default function App() {
             <Route element={<ProtectedRoute requireAdmin />}>
               <Route element={<AppShell />}>
                 <Route path="/admin" element={<AdminPage />} />
+                <Route path="/admin/ministerios" element={<AdminMinisteriosPage />} />
+                <Route path="/admin/usuarios" element={<AdminUsuariosPage />} />
+                <Route path="/admin/relatorios" element={<RelatoriosPage />} />
+                <Route path="/admin/ferramentas" element={<AdminFerramentasPage />} />
               </Route>
             </Route>
 

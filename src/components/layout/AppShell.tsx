@@ -73,7 +73,7 @@ export function AppShell() {
             <p className="text-xs uppercase tracking-[0.28em] text-gold">Lagoinha</p>
           </div>
           <h1 className="mt-1 font-brand text-3xl tracking-tight text-white">
-            {isLeader ? 'Olá, líder!' : 'Olá, equipe!'}
+            {isAdmin ? 'Olá, admin!' : isLeader ? 'Olá, líder!' : 'Olá, equipe!'}
           </h1>
           <p className="mt-1 text-sm text-muted">
             {profile?.full_name} · {title} · {friendlyTodayLabel()}

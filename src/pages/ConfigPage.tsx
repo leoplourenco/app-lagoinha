@@ -84,7 +84,11 @@ export function ConfigPage() {
                 .join(' · ')
             : 'Ainda sem ministério — peça ao líder para te adicionar.'}
         </p>
-        {isLeader ? (
+        {isAdmin ? (
+          <p className="mt-3 text-sm text-gold-soft">
+            Como admin você está acima dos líderes: ministérios, relatórios e usuários.
+          </p>
+        ) : isLeader ? (
           <p className="mt-3 text-sm text-gold-soft">
             Como líder você monta escala, gerencia equipe e vê relatórios.
           </p>

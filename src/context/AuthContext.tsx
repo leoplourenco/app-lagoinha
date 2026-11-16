@@ -18,6 +18,7 @@ type AuthContextValue = {
   profile: Profile | null
   memberships: (MinistryMember & { ministry?: Ministry })[]
   isAdmin: boolean
+  /** Líder de ministério de fato (admin NÃO conta). */
   isLeader: boolean
   isSalaMember: boolean
   isSalaLeader: boolean
@@ -66,7 +67,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let mounted = true
 
     async function init() {
-      // Troca ?code= do Google/PKCE por sessão (evita loop login ↔ home)
       const url = new URL(window.location.href)
       if (url.searchParams.has('code')) {
         const { error } = await supabase.auth.exchangeCodeForSession(window.location.href)
@@ -87,10 +87,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     void init()
 
-    // Não await supabase.from dentro deste callback (pode travar / loop)
     const { data: sub } = supabase.auth.onAuthStateChange((event, next) => {
       setSession(next)
-      if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
+      if (
+        event === 'INITIAL_SESSION' ||
+        event === 'SIGNED_IN' ||
+        event === 'SIGNED_OUT' ||
+        event === 'TOKEN_REFRESHED'
+      ) {
         setLoading(false)
       }
       if (next?.user?.id) {
@@ -109,7 +113,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<AuthContextValue>(() => {
     const isAdmin = Boolean(profile?.is_admin)
-    const isLeader = isAdmin || memberships.some((m) => m.role === 'leader')
+    // Admin fica acima dos líderes — não herda perfil de líder de ministério
+    const isLeader = memberships.some((m) => m.role === 'leader')
     const sala = memberships.find((m) => m.ministry?.slug === 'sala')
     const host = memberships.find((m) => m.ministry?.slug === 'host')
 
@@ -121,10 +126,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       memberships,
       isAdmin,
       isLeader,
-      isSalaMember: isAdmin || Boolean(sala),
-      isSalaLeader: isAdmin || sala?.role === 'leader',
-      isHostMember: isAdmin || Boolean(host),
-      isHostLeader: isAdmin || host?.role === 'leader',
+      isSalaMember: Boolean(sala),
+      isSalaLeader: sala?.role === 'leader',
+      isHostMember: Boolean(host),
+      isHostLeader: host?.role === 'leader',
       refreshProfile,
       signOut: async () => {
         await supabase.auth.signOut()

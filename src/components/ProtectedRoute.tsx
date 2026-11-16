@@ -31,9 +31,10 @@ export function ProtectedRoute({
 
   if (!session) return <Navigate to="/login" replace />
   if (requireAdmin && !isAdmin) return <Navigate to="/" replace />
-  if (requireLeader && !isLeader) return <Navigate to="/" replace />
-  if (requireSala && !isSalaMember) return <Navigate to="/" replace />
-  if (requireHost && !isHostMember) return <Navigate to="/" replace />
+  // Admin sobe acima: pode acessar telas de líder/sala/host para supervisão
+  if (requireLeader && !isLeader && !isAdmin) return <Navigate to="/" replace />
+  if (requireSala && !isSalaMember && !isAdmin) return <Navigate to="/" replace />
+  if (requireHost && !isHostMember && !isAdmin) return <Navigate to="/" replace />
 
   return <Outlet />
 }

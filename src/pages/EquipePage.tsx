@@ -4,19 +4,46 @@ import { Input } from '../components/ui/input'
 import { EmptyState } from '../components/ui/empty-state'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
-import type { MinistryMember, Profile } from '../types/database'
+import type { Ministry, MinistryMember, Profile } from '../types/database'
 
 type MemberRow = MinistryMember & { profile?: Profile }
 
 export function EquipePage() {
   const { memberships, isAdmin } = useAuth()
-  const leaderMinistries = memberships.filter((m) => isAdmin || m.role === 'leader')
-  const [ministryId, setMinistryId] = useState(leaderMinistries[0]?.ministry_id ?? '')
+  const [allMinistries, setAllMinistries] = useState<Ministry[]>([])
+  const leaderMinistries = isAdmin
+    ? allMinistries.map((m) => ({
+        ministry_id: m.id,
+        ministry: m,
+        role: 'leader' as const,
+      }))
+    : memberships.filter((m) => m.role === 'leader')
+  const [ministryId, setMinistryId] = useState('')
   const [members, setMembers] = useState<MemberRow[]>([])
   const [query, setQuery] = useState('')
   const [candidates, setCandidates] = useState<Profile[]>([])
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!isAdmin) return
+    void supabase
+      .from('ministries')
+      .select('*')
+      .eq('active', true)
+      .order('name')
+      .then(({ data }) => {
+        const rows = (data as Ministry[]) ?? []
+        setAllMinistries(rows)
+        if (!ministryId && rows[0]) setMinistryId(rows[0].id)
+      })
+  }, [isAdmin])
+
+  useEffect(() => {
+    if (!isAdmin && leaderMinistries[0] && !ministryId) {
+      setMinistryId(leaderMinistries[0].ministry_id)
+    }
+  }, [isAdmin, leaderMinistries, ministryId])
 
   async function loadMembers() {
     if (!ministryId) return

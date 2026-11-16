@@ -18,19 +18,35 @@ const SUGGESTED_LABELS = ['porta', 'café', 'recepção']
 
 export function EscalaPage() {
   const { user, isLeader, memberships, isAdmin } = useAuth()
+  const canManage = isLeader || isAdmin
   const { todayEvents, upcomingEvents, activeEvent } = useServiceEvents()
   const events = todayEvents.length > 0 ? todayEvents : upcomingEvents
   const [eventId, setEventId] = useState<string | null>(null)
   const [slots, setSlots] = useState<SlotRow[]>([])
   const [members, setMembers] = useState<(Profile & { user_id: string })[]>([])
+  const [allMinistries, setAllMinistries] = useState<Ministry[]>([])
   const [ministryId, setMinistryId] = useState('')
   const [userId, setUserId] = useState('')
   const [roleLabel, setRoleLabel] = useState('porta')
   const [error, setError] = useState<string | null>(null)
 
-  const leaderMinistries = memberships.filter(
-    (m) => isAdmin || m.role === 'leader',
-  )
+  const leaderMinistries = isAdmin
+    ? allMinistries.map((m) => ({
+        ministry_id: m.id,
+        ministry: m,
+        role: 'leader' as const,
+      }))
+    : memberships.filter((m) => m.role === 'leader')
+
+  useEffect(() => {
+    if (!isAdmin) return
+    void supabase
+      .from('ministries')
+      .select('*')
+      .eq('active', true)
+      .order('name')
+      .then(({ data }) => setAllMinistries((data as Ministry[]) ?? []))
+  }, [isAdmin])
 
   useEffect(() => {
     if (!eventId && activeEvent) setEventId(activeEvent.id)
@@ -50,7 +66,7 @@ export function EscalaPage() {
       .eq('event_id', eventId)
       .order('created_at')
 
-    if (!isLeader && user) {
+    if (!canManage && user) {
       query = query.eq('user_id', user.id)
     }
 
@@ -83,7 +99,7 @@ export function EscalaPage() {
 
   useEffect(() => {
     void loadSlots()
-  }, [eventId, user, isLeader])
+  }, [eventId, user, canManage])
 
   useEffect(() => {
     if (ministryId) void loadMembers(ministryId)
@@ -126,7 +142,7 @@ export function EscalaPage() {
 
       <ServicePicker events={events} value={eventId} onChange={setEventId} />
 
-      {isLeader ? (
+      {canManage ? (
         <form onSubmit={addSlot} className="space-y-3 rounded-2xl border border-white/15 bg-white/10 p-4">
           <p className="font-semibold">Montar escala</p>
           <select
@@ -200,7 +216,7 @@ export function EscalaPage() {
                   {eventId ? formatSp(events.find((e) => e.id === eventId)?.starts_at ?? '') : ''}
                 </p>
               </div>
-              {isLeader ? (
+              {canManage ? (
                 <Button size="sm" variant="ghost" onClick={() => void removeSlot(slot.id)}>
                   Remover
                 </Button>

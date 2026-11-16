@@ -1,5 +1,6 @@
 import { useEffect, useState, type ComponentType } from 'react'
 import {
+  Building2,
   CalendarDays,
   CheckSquare,
   ChevronRight,
@@ -103,7 +104,7 @@ export function HomePage() {
       ) : null}
 
       <Link
-        to={isLeader ? '/escala' : '/checkin'}
+        to={isAdmin ? '/admin' : isLeader ? '/escala' : '/checkin'}
         className="flex items-center gap-4 rounded-2xl border border-white/10 bg-[#1c140e] px-4 py-4"
       >
         <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gold/15 text-gold">
@@ -134,7 +135,37 @@ export function HomePage() {
         </div>
       ) : null}
 
-      {isLeader ? (
+      {isAdmin ? (
+        <section className="space-y-3">
+          <h3 className="font-brand text-xl text-gold">Painel admin</h3>
+          <p className="text-sm text-muted">
+            Você está acima dos líderes. Gerencie ministérios, relatórios e usuários.
+          </p>
+          <div className="space-y-3">
+            <ActionCard
+              to="/admin/ministerios"
+              title="Ministérios"
+              hint="Ver todos os ministérios"
+              icon={Building2}
+            />
+            <ActionCard
+              to="/admin/relatorios"
+              title="Relatórios"
+              hint="Presença e check-in por culto"
+              icon={ClipboardList}
+            />
+            <ActionCard
+              to="/admin/usuarios"
+              title="Usuários"
+              hint="Promover ou remover líderes"
+              icon={Users}
+            />
+          </div>
+          <Link to="/admin" className="inline-block text-sm font-semibold text-gold underline">
+            Abrir hub admin completo
+          </Link>
+        </section>
+      ) : isLeader ? (
         <section className="space-y-3">
           <h3 className="font-brand text-xl text-gold">Painel do líder</h3>
           <p className="text-sm text-muted">
@@ -165,9 +196,6 @@ export function HomePage() {
             ) : null}
             {isHostMember ? (
               <ActionCard to="/host" title="Host" hint="Agenda e cardápio" icon={Users} />
-            ) : null}
-            {isAdmin ? (
-              <ActionCard to="/admin" title="Admin" hint="Igreja e QR" icon={ShieldIcon} />
             ) : null}
           </div>
         </section>
@@ -232,19 +260,6 @@ export function HomePage() {
 
       <QuickLink to="/config" label="Perfil e config" />
     </div>
-  )
-}
-
-function ShieldIcon(props: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={props.className} aria-hidden>
-      <path
-        d="M12 3l7 3v5c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6l7-3z"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinejoin="round"
-      />
-    </svg>
   )
 }
 
