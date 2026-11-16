@@ -33,6 +33,8 @@ export function EscalaPage() {
   const { refresh } = useServiceEvents()
   const initialYm = useMemo(() => currentSpYearMonth(), [])
 
+  /** minha = só onde EU estou; montar = líder escala a equipe */
+  const [panel, setPanel] = useState<'minha' | 'montar'>('minha')
   const [mode, setMode] = useState<'padrao' | 'especial'>('padrao')
   const [viewYear, setViewYear] = useState(initialYm.year)
   const [viewMonth, setViewMonth] = useState(initialYm.month)
@@ -42,7 +44,8 @@ export function EscalaPage() {
   const [selecting, setSelecting] = useState(false)
   const [specialWhen, setSpecialWhen] = useState('')
   const [specialTitle, setSpecialTitle] = useState('')
-  const [slots, setSlots] = useState<SlotRow[]>([])
+  const [mySlots, setMySlots] = useState<SlotRow[]>([])
+  const [teamSlots, setTeamSlots] = useState<SlotRow[]>([])
   const [members, setMembers] = useState<Profile[]>([])
   const [allMinistries, setAllMinistries] = useState<Ministry[]>([])
   const [ministryId, setMinistryId] = useState('')
@@ -50,6 +53,9 @@ export function EscalaPage() {
   const [roleLabel, setRoleLabel] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
+
+  const showMontar = canManage && panel === 'montar'
+  const showMinha = !canManage || panel === 'minha'
 
   const monthOptions = useMemo(
     () => standardServicesForMonth(viewYear, viewMonth),
@@ -119,7 +125,7 @@ export function EscalaPage() {
 
   async function loadMyUpcomingSlots() {
     if (!user) {
-      setSlots([])
+      setMySlots([])
       return
     }
     const { data, error: err } = await supabase
@@ -145,7 +151,7 @@ export function EscalaPage() {
           new Date(a.event?.starts_at ?? 0).getTime() -
           new Date(b.event?.starts_at ?? 0).getTime(),
       )
-    setSlots(rows)
+    setMySlots(rows)
   }
 
   useEffect(() => {
@@ -171,20 +177,15 @@ export function EscalaPage() {
 
   async function loadSlotsForEvents(ids: string[]) {
     if (!user || ids.length === 0) {
-      setSlots([])
+      setTeamSlots([])
       return
     }
-    let query = supabase
+    const { data, error: err } = await supabase
       .from('schedule_slots')
       .select('*, profile:profiles(*), ministry:ministries(*), event:service_events(starts_at, title)')
       .in('event_id', ids)
       .order('created_at')
 
-    if (!canManage) {
-      query = query.eq('user_id', user.id)
-    }
-
-    const { data, error: err } = await query
     if (err) {
       setError(err.message)
       return
@@ -197,7 +198,7 @@ export function EscalaPage() {
       event: Array.isArray(s.event) ? s.event[0] : s.event,
     }))
 
-    setSlots(
+    setTeamSlots(
       rows.sort(
         (a, b) =>
           new Date(a.event?.starts_at ?? 0).getTime() -
@@ -221,9 +222,12 @@ export function EscalaPage() {
   }
 
   useEffect(() => {
-    if (canManage) return
-    void loadMyUpcomingSlots()
-  }, [user?.id, canManage])
+    if (showMinha) void loadMyUpcomingSlots()
+  }, [user?.id, showMinha])
+
+  useEffect(() => {
+    if (!showMontar) setTeamSlots([])
+  }, [showMontar])
 
   useEffect(() => {
     if (ministryId) void loadMembers(ministryId)
@@ -262,7 +266,7 @@ export function EscalaPage() {
 
   function clearSelection() {
     setSelectedKeys([])
-    setSlots([])
+    setTeamSlots([])
     setMessage(null)
   }
 
@@ -472,14 +476,15 @@ export function EscalaPage() {
         const ids = await resolveEventIds(selectedOptions)
         await loadSlotsForEvents(ids)
       } catch {
-        setSlots((prev) => prev.filter((s) => s.id !== slot.id))
+        setTeamSlots((prev) => prev.filter((s) => s.id !== slot.id))
       }
     }
+    if (showMinha) void loadMyUpcomingSlots()
   }
 
   async function previewSelected() {
     if (selectedOptions.length === 0) {
-      setSlots([])
+      setTeamSlots([])
       return
     }
     setSelecting(true)
@@ -500,13 +505,72 @@ export function EscalaPage() {
       <div>
         <h2 className="font-brand text-2xl">Escala</h2>
         <p className="mt-1 text-sm text-muted">
-          {canManage
-            ? 'Só funções do seu ministério. A mesma pessoa não pode ficar em dois ministérios no mesmo culto.'
-            : 'Veja em qual data/horário você está escalado.'}
+          {showMontar
+            ? 'Monte a equipe: só funções do seu ministério, sem colidir no mesmo culto.'
+            : 'Só aparecem os cultos em que você está escalado.'}
         </p>
       </div>
 
       {canManage ? (
+        <div className="grid grid-cols-2 gap-2">
+          <Button
+            type="button"
+            variant={panel === 'minha' ? 'default' : 'outline'}
+            onClick={() => {
+              setPanel('minha')
+              setError(null)
+              setMessage(null)
+            }}
+          >
+            Minha escala
+          </Button>
+          <Button
+            type="button"
+            variant={panel === 'montar' ? 'default' : 'outline'}
+            onClick={() => {
+              setPanel('montar')
+              setError(null)
+              setMessage(null)
+            }}
+          >
+            Montar escala
+          </Button>
+        </div>
+      ) : null}
+
+      {showMinha ? (
+        mySlots.length === 0 ? (
+          <EmptyState
+            title="Você não está em nenhuma escala"
+            description="Quando o líder te colocar, o culto e a função aparecem aqui."
+          />
+        ) : (
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-gold">Suas próximas escalas</p>
+            {mySlots.map((slot) => (
+              <div
+                key={slot.id}
+                className="rounded-xl border border-white/10 bg-white/5 px-3 py-3"
+              >
+                <p className="font-medium text-white">
+                  {slot.event?.title ?? 'Culto / evento'}
+                </p>
+                <p className="text-sm text-muted">
+                  {slot.event?.starts_at
+                    ? formatSp(slot.event.starts_at, 'EEEE, dd/MM · HH:mm')
+                    : null}
+                </p>
+                <p className="mt-1 text-sm text-gold-soft">
+                  Função: {slot.role_label || 'sem rótulo'}
+                </p>
+                <p className="text-xs text-muted">{slot.ministry?.name}</p>
+              </div>
+            ))}
+          </div>
+        )
+      ) : null}
+
+      {showMontar ? (
         <section className="space-y-3 rounded-2xl border border-white/15 bg-panel p-4">
           <div className="grid grid-cols-2 gap-2">
             <Button
@@ -671,7 +735,7 @@ export function EscalaPage() {
         </section>
       ) : null}
 
-      {canManage && selectedOptions.length > 0 ? (
+      {showMontar && selectedOptions.length > 0 ? (
         <form onSubmit={addSlot} className="space-y-3 rounded-2xl border border-white/15 bg-white/10 p-4">
           <p className="font-semibold">
             Escala · {currentMinistry?.name ?? 'seu ministério'}
@@ -740,35 +804,26 @@ export function EscalaPage() {
         </form>
       ) : null}
 
-      {canManage && selectedOptions.length === 0 ? (
+      {showMontar && selectedOptions.length === 0 ? (
         <EmptyState
           title="Marque os cultos"
           description="Selecione um ou mais cultos padrão (ou um especial) para montar a escala."
         />
       ) : null}
 
-      {canManage && selectedOptions.length > 0 && slots.length === 0 ? (
+      {showMontar && selectedOptions.length > 0 && teamSlots.length === 0 ? (
         <EmptyState
           title="Nada nestes cultos ainda"
           description="Escolha o voluntário e a função do seu ministério."
         />
       ) : null}
 
-      {!canManage && slots.length === 0 ? (
-        <EmptyState
-          title="Você não está em nenhuma escala"
-          description="Quando o líder te colocar, o culto e a função aparecem aqui."
-        />
-      ) : null}
-
-      {slots.length > 0 ? (
+      {showMontar && teamSlots.length > 0 ? (
         <div className="space-y-2">
-          <p className="text-sm font-medium text-gold">
-            {canManage ? 'Quem está na escala' : 'Suas próximas escalas'}
-          </p>
-          {slots.map((slot) => {
+          <p className="text-sm font-medium text-gold">Quem está na escala</p>
+          {teamSlots.map((slot) => {
             const mine = canManageMinistry(memberships, slot.ministry_id, isAdmin)
-            const otherMinistry = canManage && !mine
+            const otherMinistry = !mine
             return (
               <div
                 key={slot.id}
@@ -780,16 +835,10 @@ export function EscalaPage() {
                 )}
               >
                 <div>
-                  {canManage ? (
-                    <p className="font-medium">
-                      {slot.profile?.full_name ?? 'Voluntário'}
-                      {slot.user_id === user?.id ? ' (você)' : ''}
-                    </p>
-                  ) : (
-                    <p className="font-medium text-white">
-                      {slot.event?.title ?? 'Culto / evento'}
-                    </p>
-                  )}
+                  <p className="font-medium">
+                    {slot.profile?.full_name ?? 'Voluntário'}
+                    {slot.user_id === user?.id ? ' (você)' : ''}
+                  </p>
                   <p className="text-sm text-gold-soft">
                     Função: {slot.role_label || 'sem rótulo'}
                   </p>
@@ -799,7 +848,7 @@ export function EscalaPage() {
                   </p>
                   <p className="text-xs text-muted">
                     {slot.event?.starts_at
-                      ? `${formatSp(slot.event.starts_at, 'EEEE, dd/MM · HH:mm')}${canManage ? ` · ${slot.event.title}` : ''}`
+                      ? `${formatSp(slot.event.starts_at, 'EEEE, dd/MM · HH:mm')} · ${slot.event.title}`
                       : null}
                   </p>
                 </div>
