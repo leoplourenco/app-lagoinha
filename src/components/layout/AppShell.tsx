@@ -11,6 +11,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
+import { roleTitle } from '../../lib/roles'
 import { cn } from '../../lib/utils'
 import { friendlyTodayLabel } from '../../lib/timezone'
 import { GoldWaves } from '../brand/GoldWaves'
@@ -30,6 +31,7 @@ type NavItem = {
 
 export function AppShell() {
   const { profile, isAdmin, isLeader, isSalaMember, isHostMember } = useAuth()
+  const title = roleTitle({ isAdmin, isLeader })
 
   const items: NavItem[] = [
     { to: '/', label: 'Início', icon: Home, end: true },
@@ -70,9 +72,11 @@ export function AppShell() {
             />
             <p className="text-xs uppercase tracking-[0.28em] text-gold">Lagoinha</p>
           </div>
-          <h1 className="mt-1 font-brand text-3xl tracking-tight text-white">Olá, equipe!</h1>
+          <h1 className="mt-1 font-brand text-3xl tracking-tight text-white">
+            {isLeader ? 'Olá, líder!' : 'Olá, equipe!'}
+          </h1>
           <p className="mt-1 text-sm text-muted">
-            {profile?.full_name} · {friendlyTodayLabel()}
+            {profile?.full_name} · {title} · {friendlyTodayLabel()}
           </p>
           <p className="mt-1 text-sm text-muted">Que Deus abençoe nosso ministério.</p>
         </header>

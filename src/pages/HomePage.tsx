@@ -1,24 +1,41 @@
-import { useEffect, useState } from 'react'
-import { CalendarDays, ChevronRight } from 'lucide-react'
+import { useEffect, useState, type ComponentType } from 'react'
+import {
+  CalendarDays,
+  CheckSquare,
+  ChevronRight,
+  ClipboardList,
+  Users,
+} from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Badge } from '../components/ui/badge'
 import { EmptyState } from '../components/ui/empty-state'
 import { useAuth } from '../context/AuthContext'
 import { useServiceEvents } from '../hooks/useServiceEvents'
 import { formatSp } from '../lib/timezone'
+import { leaderMinistryNames, roleTitle } from '../lib/roles'
 import { supabase } from '../lib/supabase'
 import type { ScheduleSlot } from '../types/database'
 
 const DISMISS_KEY = 'lagoinha-install-card-dismissed'
 
 export function HomePage() {
-  const { user, isAdmin, isSalaMember, isHostMember, isLeader } = useAuth()
+  const {
+    user,
+    memberships,
+    isAdmin,
+    isSalaMember,
+    isHostMember,
+    isLeader,
+  } = useAuth()
   const { activeEvent, todayEvents, loading } = useServiceEvents()
   const [slots, setSlots] = useState<(ScheduleSlot & { ministry?: { name: string } })[]>([])
   const [checkedIn, setCheckedIn] = useState(false)
   const [showInstall, setShowInstall] = useState(
     () => localStorage.getItem(DISMISS_KEY) !== '1',
   )
+
+  const title = roleTitle({ isAdmin, isLeader })
+  const leaderMinistries = leaderMinistryNames(memberships)
 
   useEffect(() => {
     if (!user || !activeEvent) return
@@ -50,6 +67,15 @@ export function HomePage() {
 
   return (
     <div className="space-y-5">
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge className={isLeader || isAdmin ? 'bg-gold/25 text-gold' : undefined}>
+          Perfil: {title}
+        </Badge>
+        {leaderMinistries.length > 0 ? (
+          <Badge>{leaderMinistries.join(' · ')}</Badge>
+        ) : null}
+      </div>
+
       {showInstall ? (
         <div className="rounded-2xl border border-gold/30 bg-gold/10 p-4">
           <div className="flex items-start justify-between gap-3">
@@ -77,7 +103,7 @@ export function HomePage() {
       ) : null}
 
       <Link
-        to="/checkin"
+        to={isLeader ? '/escala' : '/checkin'}
         className="flex items-center gap-4 rounded-2xl border border-white/10 bg-[#1c140e] px-4 py-4"
       >
         <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gold/15 text-gold">
@@ -108,12 +134,88 @@ export function HomePage() {
         </div>
       ) : null}
 
+      {isLeader ? (
+        <section className="space-y-3">
+          <h3 className="font-brand text-xl text-gold">Painel do líder</h3>
+          <p className="text-sm text-muted">
+            Monte a escala, cuide da equipe e veja a presença do culto.
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <ActionCard
+              to="/escala"
+              title="Montar escala"
+              hint="Rótulos por função"
+              icon={ClipboardList}
+            />
+            <ActionCard to="/equipe" title="Equipe" hint="Adicionar voluntários" icon={Users} />
+            <ActionCard
+              to="/relatorios"
+              title="Relatórios"
+              hint="Presença por culto"
+              icon={ClipboardList}
+            />
+            <ActionCard
+              to="/checkin/manual"
+              title="Check-in manual"
+              hint="Buscar pelo nome"
+              icon={CheckSquare}
+            />
+            {isSalaMember ? (
+              <ActionCard to="/sala" title="Sala" hint="Porta, estoque, café" icon={Users} />
+            ) : null}
+            {isHostMember ? (
+              <ActionCard to="/host" title="Host" hint="Agenda e cardápio" icon={Users} />
+            ) : null}
+            {isAdmin ? (
+              <ActionCard to="/admin" title="Admin" hint="Igreja e QR" icon={ShieldIcon} />
+            ) : null}
+          </div>
+        </section>
+      ) : (
+        <section className="space-y-3">
+          <h3 className="font-brand text-xl text-gold">Área do voluntário</h3>
+          <p className="text-sm text-muted">
+            Faça check-in no culto e veja onde você serve.
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <ActionCard
+              to="/checkin"
+              title="Check-in"
+              hint="QR do culto"
+              icon={CheckSquare}
+            />
+            <ActionCard
+              to="/escala"
+              title="Minha escala"
+              hint="Função no culto"
+              icon={ClipboardList}
+            />
+            {isSalaMember ? (
+              <ActionCard to="/sala" title="Sala" hint="Operação do culto" icon={Users} />
+            ) : null}
+            {isHostMember ? (
+              <ActionCard to="/host" title="Host" hint="Convidados" icon={Users} />
+            ) : null}
+          </div>
+          {memberships.length === 0 ? (
+            <EmptyState
+              title="Você ainda não está em um ministério"
+              description="Peça ao líder para te adicionar à equipe depois do cadastro."
+            />
+          ) : null}
+        </section>
+      )}
+
       <section className="space-y-3">
-        <h3 className="font-brand text-xl text-gold">Minha escala</h3>
+        <h3 className="font-brand text-xl text-gold">Minha escala neste culto</h3>
         {slots.length === 0 ? (
           <EmptyState
             title="Você ainda não está na escala"
-            description="Peça ao líder para te adicionar à equipe e à escala."
+            description={
+              isLeader
+                ? 'Monte a escala em Escalas ou peça a outro líder.'
+                : 'Peça ao líder para te adicionar à equipe e à escala.'
+            }
           />
         ) : (
           slots.map((slot) => (
@@ -128,15 +230,44 @@ export function HomePage() {
         )}
       </section>
 
-      <section className="grid grid-cols-2 gap-3">
-        {isSalaMember ? <QuickLink to="/sala" label="Sala" /> : null}
-        {isHostMember ? <QuickLink to="/host" label="Host" /> : null}
-        {isLeader ? <QuickLink to="/equipe" label="Equipe" /> : null}
-        {isLeader ? <QuickLink to="/relatorios" label="Relatórios" /> : null}
-        {isAdmin ? <QuickLink to="/admin" label="Admin" /> : null}
-        <QuickLink to="/config" label="Mais" />
-      </section>
+      <QuickLink to="/config" label="Perfil e config" />
     </div>
+  )
+}
+
+function ShieldIcon(props: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={props.className} aria-hidden>
+      <path
+        d="M12 3l7 3v5c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6l7-3z"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+function ActionCard({
+  to,
+  title,
+  hint,
+  icon: Icon,
+}: {
+  to: string
+  title: string
+  hint: string
+  icon: ComponentType<{ className?: string }>
+}) {
+  return (
+    <Link
+      to={to}
+      className="rounded-2xl border border-white/10 bg-panel px-4 py-4 hover:border-gold/40"
+    >
+      <Icon className="mb-2 h-5 w-5 text-gold" />
+      <p className="font-semibold text-white">{title}</p>
+      <p className="mt-1 text-xs text-muted">{hint}</p>
+    </Link>
   )
 }
 
@@ -144,9 +275,9 @@ function QuickLink({ to, label }: { to: string; label: string }) {
   return (
     <Link
       to={to}
-      className="rounded-2xl border border-white/10 bg-panel px-4 py-5 text-sm font-semibold text-white hover:border-gold/40"
+      className="block rounded-2xl border border-white/10 bg-panel px-4 py-4 text-sm font-semibold text-gold hover:border-gold/40"
     >
-      <span className="text-gold">{label}</span>
+      {label}
     </Link>
   )
 }

@@ -7,7 +7,7 @@ import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 
 export function ConfigPage() {
-  const { profile, user, signOut, memberships, isAdmin } = useAuth()
+  const { profile, user, signOut, memberships, isAdmin, isLeader } = useAuth()
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -72,14 +72,27 @@ export function ConfigPage() {
       </div>
 
       <section className="rounded-2xl border border-white/10 bg-panel p-4">
-        <p className="font-semibold">{profile?.full_name}</p>
+        <p className="text-xs uppercase tracking-[0.2em] text-gold">
+          {isAdmin ? 'Admin' : isLeader ? 'Líder' : 'Voluntário'}
+        </p>
+        <p className="mt-1 font-semibold">{profile?.full_name}</p>
         <p className="text-sm text-muted">{profile?.email}</p>
         <p className="mt-2 text-xs text-muted">
-          {isAdmin ? 'Admin' : 'Voluntário'}
           {memberships.length
-            ? ` · ${memberships.map((m) => m.ministry?.name).filter(Boolean).join(', ')}`
-            : ' · ainda sem ministério'}
+            ? memberships
+                .map((m) => `${m.ministry?.name ?? 'Ministério'} (${m.role === 'leader' ? 'líder' : 'voluntário'})`)
+                .join(' · ')
+            : 'Ainda sem ministério — peça ao líder para te adicionar.'}
         </p>
+        {isLeader ? (
+          <p className="mt-3 text-sm text-gold-soft">
+            Como líder você monta escala, gerencia equipe e vê relatórios.
+          </p>
+        ) : (
+          <p className="mt-3 text-sm text-muted">
+            Como voluntário você faz check-in e consulta sua escala.
+          </p>
+        )}
       </section>
 
       <form
