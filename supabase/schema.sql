@@ -354,7 +354,7 @@ create policy service_events_leader_insert on public.service_events
   for insert to authenticated
   with check (public.is_leader_any() or public.is_admin());
 
--- schedule_slots (admin / pr√≥pria / minist√©rios que lidera / l√≠deres veem tudo p/ colis√£o)
+-- schedule_slots (admin / prÛpria / lÌderes / Sala vÍ tudo p/ porta)
 drop policy if exists schedule_slots_select on public.schedule_slots;
 create policy schedule_slots_select on public.schedule_slots for select to authenticated
   using (
@@ -362,6 +362,7 @@ create policy schedule_slots_select on public.schedule_slots for select to authe
     or user_id = auth.uid()
     or ministry_id in (select public.my_leader_ministry_ids())
     or public.is_leader_any()
+    or public.is_ministry_member(public.ministry_id_by_slug('sala'))
   );
 
 drop policy if exists schedule_slots_manage on public.schedule_slots;
@@ -398,11 +399,11 @@ create policy sala_attendance_select on public.sala_attendance for select to aut
 drop policy if exists sala_attendance_manage on public.sala_attendance;
 create policy sala_attendance_manage on public.sala_attendance for all to authenticated
   using (
-    public.is_ministry_leader(public.ministry_id_by_slug('sala'))
+    public.is_ministry_member(public.ministry_id_by_slug('sala'))
     or public.is_admin()
   )
   with check (
-    public.is_ministry_leader(public.ministry_id_by_slug('sala'))
+    public.is_ministry_member(public.ministry_id_by_slug('sala'))
     or public.is_admin()
   );
 
