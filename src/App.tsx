@@ -1,9 +1,11 @@
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import type { ReactNode } from 'react'
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { AppShell } from './components/layout/AppShell'
 import { LoginPage } from './pages/LoginPage'
 import { CadastroPage } from './pages/CadastroPage'
+import { AuthErrorPage } from './pages/AuthErrorPage'
 import { HomePage } from './pages/HomePage'
 import { CheckinPage } from './pages/CheckinPage'
 import { CheckinManualPage } from './pages/CheckinManualPage'
@@ -23,6 +25,15 @@ import { HostCardapioPage } from './pages/host/HostCardapioPage'
 import { HostLoucaPage } from './pages/host/HostLoucaPage'
 import { hasSupabaseConfig } from './lib/supabase'
 
+function OAuthErrorGate({ children }: { children: ReactNode }) {
+  const location = useLocation()
+  const params = new URLSearchParams(location.search)
+  if (params.get('error') || params.get('error_code')) {
+    return <AuthErrorPage />
+  }
+  return children
+}
+
 export default function App() {
   return (
     <AuthProvider>
@@ -40,9 +51,11 @@ export default function App() {
             </div>
           </div>
         ) : (
+          <OAuthErrorGate>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/cadastro" element={<CadastroPage />} />
+            <Route path="/auth/erro" element={<AuthErrorPage />} />
             <Route path="/instalar" element={<InstalarPage />} />
 
             <Route element={<ProtectedRoute />}>
@@ -88,6 +101,7 @@ export default function App() {
 
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          </OAuthErrorGate>
         )}
       </BrowserRouter>
     </AuthProvider>
