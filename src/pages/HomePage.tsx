@@ -5,6 +5,7 @@ import {
   CheckSquare,
   ChevronRight,
   ClipboardList,
+  QrCode,
   Users,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
@@ -39,7 +40,7 @@ export function HomePage() {
   const leaderMinistries = leaderMinistryNames(memberships)
 
   useEffect(() => {
-    if (!user || !activeEvent) return
+    if (isAdmin || !user || !activeEvent) return
     void (async () => {
       const [{ data: schedule }, { data: checkin }] = await Promise.all([
         supabase
@@ -64,12 +65,81 @@ export function HomePage() {
       )
       setCheckedIn(Boolean(checkin))
     })()
-  }, [user, activeEvent])
+  }, [user, activeEvent, isAdmin])
+
+  if (isAdmin) {
+    return (
+      <div className="space-y-5">
+        <Badge className="bg-gold/25 text-gold">Perfil: Admin</Badge>
+
+        <section className="space-y-3">
+          <h3 className="font-brand text-2xl text-gold">Painel admin</h3>
+          <p className="text-sm text-muted">
+            Você está acima dos líderes. Escolha o que quer gerenciar:
+          </p>
+
+          <Link
+            to="/admin/ministerios"
+            className="flex items-center gap-4 rounded-2xl border border-white/10 bg-panel px-4 py-5 hover:border-gold/40"
+          >
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gold/15 text-gold">
+              <Building2 className="h-6 w-6" />
+            </div>
+            <div>
+              <p className="text-lg font-semibold text-white">Ministérios</p>
+              <p className="text-sm text-muted">Ver todos os ministérios e seus líderes</p>
+            </div>
+          </Link>
+
+          <Link
+            to="/admin/relatorios"
+            className="flex items-center gap-4 rounded-2xl border border-white/10 bg-panel px-4 py-5 hover:border-gold/40"
+          >
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gold/15 text-gold">
+              <ClipboardList className="h-6 w-6" />
+            </div>
+            <div>
+              <p className="text-lg font-semibold text-white">Relatórios</p>
+              <p className="text-sm text-muted">Presença e check-in por culto</p>
+            </div>
+          </Link>
+
+          <Link
+            to="/admin/usuarios"
+            className="flex items-center gap-4 rounded-2xl border border-white/10 bg-panel px-4 py-5 hover:border-gold/40"
+          >
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gold/15 text-gold">
+              <Users className="h-6 w-6" />
+            </div>
+            <div>
+              <p className="text-lg font-semibold text-white">Usuários</p>
+              <p className="text-sm text-muted">Promover ou remover líderes</p>
+            </div>
+          </Link>
+        </section>
+
+        <Link
+          to="/admin/ferramentas"
+          className="flex items-center gap-3 rounded-2xl border border-dashed border-white/15 px-4 py-4 text-sm text-muted hover:border-gold/40 hover:text-gold"
+        >
+          <QrCode className="h-5 w-5" />
+          QR imprimível e cultos
+        </Link>
+
+        <Link
+          to="/config"
+          className="block text-center text-sm font-semibold text-gold underline"
+        >
+          Perfil e config
+        </Link>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-2">
-        <Badge className={isLeader || isAdmin ? 'bg-gold/25 text-gold' : undefined}>
+        <Badge className={isLeader ? 'bg-gold/25 text-gold' : undefined}>
           Perfil: {title}
         </Badge>
         {leaderMinistries.length > 0 ? (
@@ -104,7 +174,7 @@ export function HomePage() {
       ) : null}
 
       <Link
-        to={isAdmin ? '/admin' : isLeader ? '/escala' : '/checkin'}
+        to={isLeader ? '/escala' : '/checkin'}
         className="flex items-center gap-4 rounded-2xl border border-white/10 bg-[#1c140e] px-4 py-4"
       >
         <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gold/15 text-gold">
@@ -135,37 +205,7 @@ export function HomePage() {
         </div>
       ) : null}
 
-      {isAdmin ? (
-        <section className="space-y-3">
-          <h3 className="font-brand text-xl text-gold">Painel admin</h3>
-          <p className="text-sm text-muted">
-            Você está acima dos líderes. Gerencie ministérios, relatórios e usuários.
-          </p>
-          <div className="space-y-3">
-            <ActionCard
-              to="/admin/ministerios"
-              title="Ministérios"
-              hint="Ver todos os ministérios"
-              icon={Building2}
-            />
-            <ActionCard
-              to="/admin/relatorios"
-              title="Relatórios"
-              hint="Presença e check-in por culto"
-              icon={ClipboardList}
-            />
-            <ActionCard
-              to="/admin/usuarios"
-              title="Usuários"
-              hint="Promover ou remover líderes"
-              icon={Users}
-            />
-          </div>
-          <Link to="/admin" className="inline-block text-sm font-semibold text-gold underline">
-            Abrir hub admin completo
-          </Link>
-        </section>
-      ) : isLeader ? (
+      {isLeader ? (
         <section className="space-y-3">
           <h3 className="font-brand text-xl text-gold">Painel do líder</h3>
           <p className="text-sm text-muted">
