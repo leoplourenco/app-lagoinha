@@ -347,6 +347,12 @@ drop policy if exists service_events_admin on public.service_events;
 create policy service_events_admin on public.service_events for all to authenticated
   using (public.is_admin()) with check (public.is_admin());
 
+-- Líderes criam culto/evento ao montar escala (padrão ou especial)
+drop policy if exists service_events_leader_insert on public.service_events;
+create policy service_events_leader_insert on public.service_events
+  for insert to authenticated
+  with check (public.is_leader_any() or public.is_admin());
+
 -- schedule_slots (admin / própria / ministérios que lidera)
 drop policy if exists schedule_slots_select on public.schedule_slots;
 create policy schedule_slots_select on public.schedule_slots for select to authenticated
