@@ -5,6 +5,7 @@ import { Input } from '../../components/ui/input'
 import { EmptyState } from '../../components/ui/empty-state'
 import { Badge } from '../../components/ui/badge'
 import { supabase } from '../../lib/supabase'
+import { cn } from '../../lib/utils'
 import type { Ministry, MinistryMember, Profile } from '../../types/database'
 
 type MemberRow = MinistryMember & { ministry?: Ministry }
@@ -14,6 +15,9 @@ export function AdminUsuariosPage() {
   const [ministries, setMinistries] = useState<Ministry[]>([])
   const [members, setMembers] = useState<MemberRow[]>([])
   const [query, setQuery] = useState('')
+  const [openUserId, setOpenUserId] = useState<string | null>(null)
+  const [addMinistryId, setAddMinistryId] = useState('')
+  const [addAsLeader, setAddAsLeader] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -53,6 +57,14 @@ export function AdminUsuariosPage() {
 
   function membershipsFor(userId: string) {
     return members.filter((m) => m.user_id === userId)
+  }
+
+  function toggleOpen(userId: string) {
+    setOpenUserId((prev) => (prev === userId ? null : userId))
+    setAddMinistryId('')
+    setAddAsLeader(false)
+    setMessage(null)
+    setError(null)
   }
 
   async function makeLeader(user: Profile, ministryId: string) {
@@ -118,10 +130,11 @@ export function AdminUsuariosPage() {
     }
 
     setMessage(`${user.full_name} é voluntário de ${ministryName}.`)
+    setAddMinistryId('')
+    setAddAsLeader(false)
     await load()
   }
 
-  /** Sai do ministério por completo — sem isso, "remover líder" deixava voluntário e o hub continuava aberto. */
   async function removeFromMinistry(user: Profile, ministryId: string) {
     setMessage(null)
     setError(null)
@@ -142,6 +155,15 @@ export function AdminUsuariosPage() {
     const ministryName = ministries.find((m) => m.id === ministryId)?.name ?? 'ministério'
     setMessage(`${user.full_name} foi desvinculado de ${ministryName}.`)
     await load()
+  }
+
+  async function addToMinistry(user: Profile) {
+    if (!addMinistryId) {
+      setError('Escolha um ministério.')
+      return
+    }
+    if (addAsLeader) await makeLeader(user, addMinistryId)
+    else await makeVolunteer(user, addMinistryId)
   }
 
   async function setAdmin(user: Profile, value: boolean) {
@@ -171,8 +193,8 @@ export function AdminUsuariosPage() {
         </Link>
         <h2 className="mt-2 font-brand text-2xl text-gold">Usuários</h2>
         <p className="mt-1 text-sm text-muted">
-          Por ministério: tornar líder, voluntário ou desvincular (sai de vez e perde o
-          acesso àquele hub).
+          Toque na pessoa para gerenciar. Só aparece o que ela já tem + opção de vincular
+          outro ministério.
         </p>
       </div>
 
@@ -185,119 +207,150 @@ export function AdminUsuariosPage() {
       {filtered.length === 0 ? (
         <EmptyState title="Nenhum usuário encontrado" />
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-2">
           {filtered.map((user) => {
             const userMemberships = membershipsFor(user.user_id)
+            const open = openUserId === user.user_id
+            const availableMinistries = ministries.filter(
+              (m) => !userMemberships.some((mem) => mem.ministry_id === m.id),
+            )
+
             return (
-              <div key={user.user_id} className="rounded-2xl border border-white/10 bg-panel p-4">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div>
+              <div
+                key={user.user_id}
+                className={cn(
+                  'rounded-2xl border bg-panel',
+                  open ? 'border-gold/40' : 'border-white/10',
+                )}
+              >
+                <button
+                  type="button"
+                  className="flex w-full items-start justify-between gap-3 px-4 py-3 text-left"
+                  onClick={() => toggleOpen(user.user_id)}
+                >
+                  <div className="min-w-0">
                     <p className="font-semibold text-white">{user.full_name}</p>
-                    <p className="text-xs text-muted">{user.email}</p>
+                    <p className="truncate text-xs text-muted">{user.email}</p>
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {user.is_admin ? <Badge>Admin</Badge> : null}
+                      {userMemberships.length === 0 && !user.is_admin ? (
+                        <span className="text-xs text-muted">Sem ministério</span>
+                      ) : null}
+                      {userMemberships.map((m) => (
+                        <Badge key={m.id}>
+                          {m.role === 'leader' ? 'Líder' : 'Vol.'} · {m.ministry?.name}
+                        </Badge>
+                      ))}
+                    </div>
                   </div>
-                  <div className="flex flex-wrap gap-1">
-                    {user.is_admin ? <Badge>Admin</Badge> : null}
-                    {userMemberships.map((m) => (
-                      <Badge key={m.id}>
-                        {m.role === 'leader' ? 'Líder' : 'Voluntário'} · {m.ministry?.name}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
+                  <span className="shrink-0 text-gold">{open ? '▲' : '▼'}</span>
+                </button>
 
-                <div className="mt-4 space-y-2">
-                  <p className="text-xs uppercase tracking-wide text-gold">Por ministério</p>
-                  {ministries.map((ministry) => {
-                    const mem = userMemberships.find((m) => m.ministry_id === ministry.id)
-                    const isLeader = mem?.role === 'leader'
-                    const isVolunteer = mem?.role === 'volunteer'
-                    return (
-                      <div
-                        key={ministry.id}
-                        className="flex flex-col gap-2 rounded-xl bg-black/30 px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
-                      >
-                        <div>
-                          <p className="text-sm font-medium">{ministry.name}</p>
-                          <p className="text-xs text-muted">
-                            {isLeader
-                              ? 'É líder'
-                              : isVolunteer
-                                ? 'É voluntário'
-                                : 'Fora da equipe'}
-                          </p>
-                        </div>
-                        <div className="flex flex-wrap gap-1">
-                          {!mem ? (
-                            <>
-                              <Button
-                                size="sm"
-                                onClick={() => void makeLeader(user, ministry.id)}
-                              >
-                                Tornar líder
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => void makeVolunteer(user, ministry.id)}
-                              >
-                                Voluntário
-                              </Button>
-                            </>
-                          ) : null}
-                          {isVolunteer ? (
-                            <>
-                              <Button
-                                size="sm"
-                                onClick={() => void makeLeader(user, ministry.id)}
-                              >
-                                Tornar líder
-                              </Button>
+                {open ? (
+                  <div className="space-y-3 border-t border-white/10 px-4 py-4">
+                    {userMemberships.length === 0 ? (
+                      <p className="text-sm text-muted">Ainda não está em nenhum ministério.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        <p className="text-xs uppercase tracking-wide text-gold">
+                          Ministérios vinculados
+                        </p>
+                        {userMemberships.map((mem) => (
+                          <div
+                            key={mem.id}
+                            className="flex flex-col gap-2 rounded-xl bg-black/30 px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
+                          >
+                            <div>
+                              <p className="text-sm font-medium">
+                                {mem.ministry?.name ?? 'Ministério'}
+                              </p>
+                              <p className="text-xs text-muted">
+                                {mem.role === 'leader' ? 'Líder' : 'Voluntário'}
+                              </p>
+                            </div>
+                            <div className="flex flex-wrap gap-1">
+                              {mem.role === 'volunteer' ? (
+                                <Button
+                                  size="sm"
+                                  onClick={() => void makeLeader(user, mem.ministry_id)}
+                                >
+                                  Tornar líder
+                                </Button>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => void makeVolunteer(user, mem.ministry_id)}
+                                >
+                                  Só voluntário
+                                </Button>
+                              )}
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => void removeFromMinistry(user, ministry.id)}
+                                onClick={() => void removeFromMinistry(user, mem.ministry_id)}
                               >
                                 Desvincular
                               </Button>
-                            </>
-                          ) : null}
-                          {isLeader ? (
-                            <>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => void makeVolunteer(user, ministry.id)}
-                              >
-                                Só voluntário
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => void removeFromMinistry(user, ministry.id)}
-                              >
-                                Desvincular
-                              </Button>
-                            </>
-                          ) : null}
-                        </div>
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    )
-                  })}
-                </div>
+                    )}
 
-                <div className="mt-4 border-t border-white/10 pt-3">
-                  <p className="mb-2 text-xs text-muted">
-                    Admin do app ≠ líder de ministério. Use isso só para pastores/admins
-                    globais.
-                  </p>
-                  <Button
-                    size="sm"
-                    variant={user.is_admin ? 'outline' : 'secondary'}
-                    onClick={() => void setAdmin(user, !user.is_admin)}
-                  >
-                    {user.is_admin ? 'Remover admin do app' : 'Promover a admin do app'}
-                  </Button>
-                </div>
+                    {availableMinistries.length > 0 ? (
+                      <div className="space-y-2 rounded-xl border border-dashed border-white/15 p-3">
+                        <p className="text-xs uppercase tracking-wide text-gold">
+                          Vincular ministério
+                        </p>
+                        <select
+                          className="h-11 w-full rounded-xl border border-white/15 bg-panel-2 px-3 text-sm"
+                          value={addMinistryId}
+                          onChange={(e) => setAddMinistryId(e.target.value)}
+                        >
+                          <option value="">Escolher ministério…</option>
+                          {availableMinistries.map((m) => (
+                            <option key={m.id} value={m.id}>
+                              {m.name}
+                            </option>
+                          ))}
+                        </select>
+                        <label className="flex items-center gap-2 text-sm text-muted">
+                          <input
+                            type="checkbox"
+                            checked={addAsLeader}
+                            onChange={(e) => setAddAsLeader(e.target.checked)}
+                            className="rounded border-white/30"
+                          />
+                          Já como líder
+                        </label>
+                        <Button
+                          size="sm"
+                          className="w-full"
+                          disabled={!addMinistryId}
+                          onClick={() => void addToMinistry(user)}
+                        >
+                          Vincular
+                        </Button>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted">Já está em todos os ministérios.</p>
+                    )}
+
+                    <div className="border-t border-white/10 pt-3">
+                      <p className="mb-2 text-xs text-muted">
+                        Admin do app ≠ líder de ministério.
+                      </p>
+                      <Button
+                        size="sm"
+                        variant={user.is_admin ? 'outline' : 'secondary'}
+                        onClick={() => void setAdmin(user, !user.is_admin)}
+                      >
+                        {user.is_admin ? 'Remover admin do app' : 'Promover a admin do app'}
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
               </div>
             )
           })}
